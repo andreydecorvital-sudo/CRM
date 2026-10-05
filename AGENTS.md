@@ -3,8 +3,9 @@
 Antes de alterar o projeto, leia:
 
 1. `docs/SYSTEM_MAP.md`
-2. `docs/ARCHITECTURE.md`
-3. o documento específico do domínio afetado.
+2. `docs/ROUTER.md`
+3. `docs/ARCHITECTURE.md`
+4. o documento específico do domínio afetado.
 
 ## Regras obrigatórias
 
@@ -18,6 +19,11 @@ Antes de alterar o projeto, leia:
 - Retry não pode duplicar contato, mensagem, job, automação ou cobrança de uso.
 - Consentimento deve ser verificado imediatamente antes de envio promocional.
 - QR do WhatsApp é temporário e nunca deve ser persistido.
+- Evento sistêmico ou recomendação de IA que proponha write deve passar pelo Governed Action Plane.
+- Action Proposal não é autorização; autorização não é execução.
+- Adapter é o único owner de uma mutação governada.
+- Write governado precisa de post-read verification; `unknown` impede replay cego.
+- Não criar um segundo Router/Action OS paralelo.
 - Mudança estrutural exige atualização do `docs/SYSTEM_MAP.md`.
 
 ## Gates

@@ -21,6 +21,8 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 - lead scoring explicável
 - base de conhecimento full-text para o motor de IA
 - eventos de domínio e motor de automações
+- Event Router com capability owners
+- Action Proposal → Authorized Intent → Adapter → Verification
 - durable jobs, retry e dead jobs
 - outbox de mensagens
 - webhooks outbound com HMAC
@@ -41,9 +43,13 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 
 `Origem → Lead → Atendimento → Tarefa → Proposta → Venda → Recorrência → Avaliação → Reativação`
 
-Backend:
+Backend explícito:
 
-`Domain Event → Scoring → Automation Rule → Durable Job → Action / Outbox / Webhook`
+`Domain Event → Automation Rule → Durable Job → Action / Outbox`
+
+Backend governado:
+
+`Domain Event → Event Router → Capability → Action Proposal → Authorized Intent → Adapter → Verify → Receipt`
 
 ## Migrations
 
@@ -101,6 +107,7 @@ Veja `docs/WHATSAPP.md`.
 ## Docs
 
 - `docs/SYSTEM_MAP.md`
+- `docs/ROUTER.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`
 - `docs/BACKEND.md`

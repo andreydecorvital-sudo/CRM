@@ -18,6 +18,10 @@
 - [x] knowledge FTS
 - [x] domain events
 - [x] automation engine
+- [x] Event Router + capability owner registry
+- [x] Action Proposal / Authorized Intent
+- [x] governed adapter registry + post-read verification
+- [x] execution receipts + replay guard
 - [x] durable job queue
 - [x] outbox
 - [x] webhooks

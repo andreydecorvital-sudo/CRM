@@ -11,7 +11,9 @@ alter table public.job_queue
     'webhook',
     'notification',
     'maintenance',
-    'contact_import'
+    'contact_import',
+    'event_router',
+    'action_execution'
   ));
 
 create or replace function private.enqueue_job(
@@ -37,7 +39,9 @@ begin
     'webhook',
     'notification',
     'maintenance',
-    'contact_import'
+    'contact_import',
+    'event_router',
+    'action_execution'
   ) then
     raise exception 'tipo de job inválido';
   end if;
@@ -1432,3 +1436,676 @@ using ((select private.is_tenant_member(tenant_id)));
 revoke all on public.whatsapp_session_events from anon;
 grant select on public.whatsapp_session_events to authenticated;
 grant all on public.whatsapp_session_events to service_role;
+
+
+-- CRM Router / governed action plane.
+-- Pattern adapted from the proven Event Router + Action Proposal + Authorized Intent lifecycle,
+-- but implemented as an independent CRM subsystem.
+
+create table if not exists public.event_router_dispatches (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  event_id uuid not null references public.domain_events(id) on delete cascade,
+  capability text not null check (char_length(capability) between 2 and 80),
+  severity text not null default 'info'
+    check (severity in ('info','warning','critical')),
+  wake_mode text not null default 'route'
+    check (wake_mode in ('observe','route','propose')),
+  policy_key text not null,
+  fingerprint text not null,
+  aggregate_type text not null,
+  aggregate_id uuid,
+  contact_id uuid references public.contacts(id) on delete set null,
+  summary text not null,
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'routed'
+    check (status in ('routed','consumed','ignored','failed')),
+  routed_at timestamptz not null default now(),
+  consumed_at timestamptz,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (event_id, capability),
+  unique (tenant_id, fingerprint)
+);
+
+create index if not exists event_router_dispatches_capability_idx
+  on public.event_router_dispatches (tenant_id,capability,status,severity,routed_at desc);
+
+create index if not exists event_router_dispatches_event_idx
+  on public.event_router_dispatches (event_id,routed_at desc);
+
+create table if not exists public.action_proposals (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  dispatch_id uuid references public.event_router_dispatches(id) on delete set null,
+  action_key text not null,
+  action_type text not null check (char_length(action_type) between 3 and 120),
+  target_type text not null check (char_length(target_type) between 2 and 80),
+  target_id uuid,
+  recommendation text not null check (char_length(recommendation) between 1 and 4000),
+  payload jsonb not null default '{}'::jsonb,
+  evidence jsonb not null default '[]'::jsonb,
+  missing_data text[] not null default '{}',
+  risk_level text not null default 'medium'
+    check (risk_level in ('low','medium','high','critical')),
+  confidence numeric(5,4) not null default 0
+    check (confidence between 0 and 1),
+  source text not null default 'router'
+    check (source in ('router','ai','human','system')),
+  proposal_only boolean not null default true,
+  status text not null default 'awaiting_approval'
+    check (status in ('proposed','awaiting_approval','authorized','rejected','expired')),
+  expires_at timestamptz,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id,action_key)
+);
+
+create index if not exists action_proposals_queue_idx
+  on public.action_proposals (tenant_id,status,risk_level,created_at desc);
+
+create table if not exists public.authorized_intents (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  proposal_id uuid not null references public.action_proposals(id) on delete cascade,
+  action_key text not null,
+  action_type text not null,
+  target_type text not null,
+  target_id uuid,
+  payload jsonb not null default '{}'::jsonb,
+  proposal_snapshot jsonb not null,
+  status text not null default 'authorized'
+    check (status in ('authorized','rejected','expired','revoked')),
+  authorization_source text not null
+    check (authorization_source in ('policy','human')),
+  authorized_by uuid references auth.users(id) on delete set null,
+  authorization_reason text,
+  authorization_granted boolean not null default true,
+  proposal_only_cleared boolean not null default true,
+  authorized_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (proposal_id),
+  unique (tenant_id,action_key)
+);
+
+create index if not exists authorized_intents_ready_idx
+  on public.authorized_intents (tenant_id,status,authorized_at);
+
+create table if not exists public.action_execution_receipts (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  intent_id uuid not null references public.authorized_intents(id) on delete cascade,
+  action_key text not null,
+  adapter_key text,
+  status text not null default 'executing'
+    check (status in (
+      'executing',
+      'verified',
+      'failed',
+      'unknown',
+      'rolled_back',
+      'blocked',
+      'adapter_missing'
+    )),
+  attempts integer not null default 0 check (attempts >= 0),
+  worker_id text,
+  locked_at timestamptz,
+  facts_before jsonb,
+  execution_result jsonb,
+  verification jsonb,
+  rollback_result jsonb,
+  error text,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (intent_id),
+  unique (tenant_id,action_key)
+);
+
+create index if not exists action_execution_receipts_health_idx
+  on public.action_execution_receipts (tenant_id,status,updated_at desc);
+
+create or replace function private.validate_event_router_dispatch()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists(
+    select 1
+    from public.domain_events e
+    where e.id = new.event_id
+      and e.tenant_id = new.tenant_id
+  ) then
+    raise exception 'dispatch/event incompatíveis';
+  end if;
+
+  if new.contact_id is not null and not exists(
+    select 1
+    from public.contacts c
+    where c.id = new.contact_id
+      and c.tenant_id = new.tenant_id
+  ) then
+    raise exception 'dispatch/contact incompatíveis';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.validate_event_router_dispatch()
+from public, anon, authenticated;
+
+drop trigger if exists event_router_dispatches_validate
+on public.event_router_dispatches;
+
+create trigger event_router_dispatches_validate
+before insert or update of tenant_id,event_id,contact_id
+on public.event_router_dispatches
+for each row execute function private.validate_event_router_dispatch();
+
+create or replace function private.validate_action_proposal()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.dispatch_id is not null and not exists(
+    select 1
+    from public.event_router_dispatches d
+    where d.id = new.dispatch_id
+      and d.tenant_id = new.tenant_id
+  ) then
+    raise exception 'proposal/dispatch incompatíveis';
+  end if;
+
+  if new.created_by is not null and not exists(
+    select 1
+    from public.tenant_members tm
+    where tm.tenant_id = new.tenant_id
+      and tm.user_id = new.created_by
+  ) then
+    raise exception 'criador da proposal fora do tenant';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.validate_action_proposal()
+from public, anon, authenticated;
+
+drop trigger if exists action_proposals_validate
+on public.action_proposals;
+
+create trigger action_proposals_validate
+before insert or update of tenant_id,dispatch_id,created_by
+on public.action_proposals
+for each row execute function private.validate_action_proposal();
+
+create or replace function private.domain_event_router_after_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform private.enqueue_job(
+    new.tenant_id,
+    'event_router',
+    jsonb_build_object('eventId',new.id),
+    'event-router:' || new.id::text,
+    new.next_attempt_at,
+    120,
+    8
+  );
+  return new;
+end;
+$$;
+
+revoke execute on function private.domain_event_router_after_insert()
+from public, anon, authenticated;
+
+drop trigger if exists domain_events_route on public.domain_events;
+create trigger domain_events_route
+after insert on public.domain_events
+for each row execute function private.domain_event_router_after_insert();
+
+create or replace function private.authorized_intent_after_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status = 'authorized'
+     and new.authorization_granted = true
+     and new.proposal_only_cleared = true
+  then
+    perform private.enqueue_job(
+      new.tenant_id,
+      'action_execution',
+      jsonb_build_object('intentId',new.id),
+      'action-execution:' || new.id::text,
+      now() + interval '2 seconds',
+      90,
+      5
+    );
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function private.authorized_intent_after_insert()
+from public, anon, authenticated;
+
+drop trigger if exists authorized_intents_enqueue_execution on public.authorized_intents;
+create trigger authorized_intents_enqueue_execution
+after insert on public.authorized_intents
+for each row execute function private.authorized_intent_after_insert();
+
+create or replace function public.crm_decide_action_proposal(
+  p_tenant_id uuid,
+  p_proposal_id uuid,
+  p_decision text,
+  p_source text,
+  p_actor_user_id uuid default null,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_proposal public.action_proposals%rowtype;
+  v_intent public.authorized_intents%rowtype;
+  v_now timestamptz := now();
+begin
+  if p_decision not in ('authorize','reject') then
+    raise exception 'decisão inválida';
+  end if;
+
+  if p_source not in ('policy','human') then
+    raise exception 'fonte de autorização inválida';
+  end if;
+
+  select * into v_proposal
+  from public.action_proposals p
+  where p.id = p_proposal_id
+    and p.tenant_id = p_tenant_id
+  for update;
+
+  if v_proposal.id is null then
+    raise exception 'Action Proposal não encontrada';
+  end if;
+
+  if v_proposal.status = 'authorized' and p_decision = 'authorize' then
+    select * into v_intent
+    from public.authorized_intents i
+    where i.proposal_id = v_proposal.id;
+
+    return jsonb_build_object(
+      'proposalId',v_proposal.id,
+      'proposalStatus',v_proposal.status,
+      'intentId',v_intent.id,
+      'intentStatus',v_intent.status,
+      'executionStarted',false
+    );
+  end if;
+
+  if v_proposal.status = 'rejected' and p_decision = 'reject' then
+    return jsonb_build_object(
+      'proposalId',v_proposal.id,
+      'proposalStatus','rejected',
+      'executionStarted',false
+    );
+  end if;
+
+  if v_proposal.status in ('authorized','rejected','expired') then
+    raise exception 'Action Proposal já possui decisão final';
+  end if;
+
+  if v_proposal.expires_at is not null and v_proposal.expires_at <= v_now then
+    update public.action_proposals
+    set status = 'expired',updated_at = v_now
+    where id = v_proposal.id;
+    raise exception 'Action Proposal expirada';
+  end if;
+
+  if p_source = 'human' then
+    if p_actor_user_id is null or not exists(
+      select 1
+      from public.tenant_members tm
+      where tm.tenant_id = p_tenant_id
+        and tm.user_id = p_actor_user_id
+    ) then
+      raise exception 'operador não pertence ao tenant';
+    end if;
+  end if;
+
+  if p_decision = 'reject' then
+    update public.action_proposals
+    set status = 'rejected',updated_at = v_now
+    where id = v_proposal.id;
+
+    return jsonb_build_object(
+      'proposalId',v_proposal.id,
+      'proposalStatus','rejected',
+      'executionStarted',false
+    );
+  end if;
+
+  if not v_proposal.proposal_only then
+    raise exception 'proposalOnly já foi removido fora do fluxo de autorização';
+  end if;
+
+  if cardinality(v_proposal.missing_data) > 0 then
+    raise exception 'Action Proposal possui dados faltantes';
+  end if;
+
+  if p_source = 'policy' then
+    if v_proposal.risk_level <> 'low' then
+      raise exception 'política automática aceita somente risco baixo';
+    end if;
+
+    if v_proposal.confidence < 0.9000 then
+      raise exception 'confiança insuficiente para autorização por política';
+    end if;
+
+    if v_proposal.action_type not in ('task.create','contact.tag','deal.follow_up') then
+      raise exception 'ação fora da allowlist automática';
+    end if;
+  end if;
+
+  insert into public.authorized_intents (
+    tenant_id,
+    proposal_id,
+    action_key,
+    action_type,
+    target_type,
+    target_id,
+    payload,
+    proposal_snapshot,
+    status,
+    authorization_source,
+    authorized_by,
+    authorization_reason,
+    authorization_granted,
+    proposal_only_cleared,
+    authorized_at
+  )
+  values (
+    v_proposal.tenant_id,
+    v_proposal.id,
+    v_proposal.action_key,
+    v_proposal.action_type,
+    v_proposal.target_type,
+    v_proposal.target_id,
+    v_proposal.payload,
+    to_jsonb(v_proposal),
+    'authorized',
+    p_source,
+    p_actor_user_id,
+    nullif(trim(coalesce(p_reason,'')),''),
+    true,
+    true,
+    v_now
+  )
+  on conflict (proposal_id) do update set
+    authorization_reason = coalesce(
+      excluded.authorization_reason,
+      public.authorized_intents.authorization_reason
+    )
+  returning * into v_intent;
+
+  update public.action_proposals
+  set status = 'authorized',
+      proposal_only = false,
+      updated_at = v_now
+  where id = v_proposal.id;
+
+  return jsonb_build_object(
+    'proposalId',v_proposal.id,
+    'proposalStatus','authorized',
+    'intentId',v_intent.id,
+    'intentStatus',v_intent.status,
+    'executionStarted',false
+  );
+end;
+$$;
+
+revoke all on function public.crm_decide_action_proposal(
+  uuid,uuid,text,text,uuid,text
+) from public, anon, authenticated;
+
+grant execute on function public.crm_decide_action_proposal(
+  uuid,uuid,text,text,uuid,text
+) to service_role;
+
+create or replace function public.crm_claim_action_execution(
+  p_tenant_id uuid,
+  p_intent_id uuid,
+  p_worker_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_intent public.authorized_intents%rowtype;
+  v_receipt public.action_execution_receipts%rowtype;
+  v_now timestamptz := now();
+begin
+  if nullif(trim(coalesce(p_worker_id,'')),'') is null then
+    raise exception 'worker id obrigatório';
+  end if;
+
+  select * into v_intent
+  from public.authorized_intents i
+  where i.id = p_intent_id
+    and i.tenant_id = p_tenant_id
+  for update;
+
+  if v_intent.id is null then
+    raise exception 'Authorized Intent não encontrada';
+  end if;
+
+  if v_intent.status <> 'authorized'
+     or not v_intent.authorization_granted
+     or not v_intent.proposal_only_cleared
+  then
+    return jsonb_build_object(
+      'claimed',false,
+      'reason','authorization_required',
+      'intentId',v_intent.id
+    );
+  end if;
+
+  select * into v_receipt
+  from public.action_execution_receipts r
+  where r.intent_id = v_intent.id
+  for update;
+
+  if v_receipt.id is not null
+     and v_receipt.status in ('verified','unknown','rolled_back','blocked','adapter_missing')
+  then
+    return jsonb_build_object(
+      'claimed',false,
+      'reason','terminal',
+      'receiptId',v_receipt.id,
+      'receiptStatus',v_receipt.status
+    );
+  end if;
+
+  if v_receipt.id is not null
+     and v_receipt.status = 'executing'
+     and v_receipt.locked_at is not null
+     and v_receipt.locked_at > v_now - interval '10 minutes'
+     and v_receipt.worker_id is distinct from p_worker_id
+  then
+    return jsonb_build_object(
+      'claimed',false,
+      'reason','leased',
+      'receiptId',v_receipt.id
+    );
+  end if;
+
+  if v_receipt.id is null then
+    insert into public.action_execution_receipts (
+      tenant_id,
+      intent_id,
+      action_key,
+      status,
+      attempts,
+      worker_id,
+      locked_at,
+      started_at,
+      updated_at
+    )
+    values (
+      v_intent.tenant_id,
+      v_intent.id,
+      v_intent.action_key,
+      'executing',
+      1,
+      left(trim(p_worker_id),160),
+      v_now,
+      v_now,
+      v_now
+    )
+    returning * into v_receipt;
+  else
+    update public.action_execution_receipts
+    set status = 'executing',
+        attempts = attempts + 1,
+        worker_id = left(trim(p_worker_id),160),
+        locked_at = v_now,
+        error = null,
+        completed_at = null,
+        updated_at = v_now
+    where id = v_receipt.id
+    returning * into v_receipt;
+  end if;
+
+  return jsonb_build_object(
+    'claimed',true,
+    'receiptId',v_receipt.id,
+    'intent',to_jsonb(v_intent)
+  );
+end;
+$$;
+
+revoke all on function public.crm_claim_action_execution(uuid,uuid,text)
+from public, anon, authenticated;
+
+grant execute on function public.crm_claim_action_execution(uuid,uuid,text)
+to service_role;
+
+create or replace function public.crm_finish_action_execution(
+  p_receipt_id uuid,
+  p_worker_id text,
+  p_status text,
+  p_adapter_key text default null,
+  p_facts_before jsonb default null,
+  p_execution_result jsonb default null,
+  p_verification jsonb default null,
+  p_rollback_result jsonb default null,
+  p_error text default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  if p_status not in (
+    'verified',
+    'failed',
+    'unknown',
+    'rolled_back',
+    'blocked',
+    'adapter_missing'
+  ) then
+    raise exception 'status terminal inválido';
+  end if;
+
+  update public.action_execution_receipts
+  set status = p_status,
+      adapter_key = nullif(trim(coalesce(p_adapter_key,'')),''),
+      facts_before = p_facts_before,
+      execution_result = p_execution_result,
+      verification = p_verification,
+      rollback_result = p_rollback_result,
+      error = nullif(left(trim(coalesce(p_error,'')),4000),''),
+      worker_id = null,
+      locked_at = null,
+      completed_at = now(),
+      updated_at = now()
+  where id = p_receipt_id
+    and status = 'executing'
+    and worker_id = p_worker_id;
+
+  get diagnostics v_count = row_count;
+  return v_count = 1;
+end;
+$$;
+
+revoke all on function public.crm_finish_action_execution(
+  uuid,text,text,text,jsonb,jsonb,jsonb,jsonb,text
+) from public, anon, authenticated;
+
+grant execute on function public.crm_finish_action_execution(
+  uuid,text,text,text,jsonb,jsonb,jsonb,jsonb,text
+) to service_role;
+
+alter table public.event_router_dispatches enable row level security;
+alter table public.action_proposals enable row level security;
+alter table public.authorized_intents enable row level security;
+alter table public.action_execution_receipts enable row level security;
+
+create policy "members event_router_dispatches read"
+on public.event_router_dispatches
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+create policy "members action_proposals read"
+on public.action_proposals
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+create policy "members authorized_intents read"
+on public.authorized_intents
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+create policy "members action_execution_receipts read"
+on public.action_execution_receipts
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+revoke all on public.event_router_dispatches,
+  public.action_proposals,
+  public.authorized_intents,
+  public.action_execution_receipts
+from anon;
+
+grant select on public.event_router_dispatches,
+  public.action_proposals,
+  public.authorized_intents,
+  public.action_execution_receipts
+to authenticated;
+
+grant all on public.event_router_dispatches,
+  public.action_proposals,
+  public.authorized_intents,
+  public.action_execution_receipts
+to service_role;

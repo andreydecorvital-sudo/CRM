@@ -3,6 +3,8 @@ import { processAutomationEvent } from "@/lib/server/automation/engine"
 import { processOutboundMessage } from "@/lib/server/outbound/processor"
 import { processWebhookDelivery } from "@/lib/server/webhooks/processor"
 import { processContactImportChunk } from "@/lib/server/imports/processor"
+import { routeDomainEvent } from "@/lib/server/router/event-router"
+import { executeAuthorizedIntent } from "@/lib/server/router/execution"
 import type { JobRow } from "@/lib/server/automation/types"
 
 function payloadId(job: JobRow, key: string) {
@@ -19,6 +21,17 @@ export async function processClaimedJob(job: JobRow) {
       return processOutboundMessage(payloadId(job, "messageId"))
     case "webhook":
       return processWebhookDelivery(payloadId(job, "deliveryId"))
+    case "event_router":
+      return routeDomainEvent(payloadId(job, "eventId"))
+    case "action_execution": {
+      const workerId = String(job.locked_by || "").trim()
+      if (!workerId) throw new Error(`Job ${job.id} sem worker owner.`)
+      return executeAuthorizedIntent({
+        tenantId: job.tenant_id,
+        intentId: payloadId(job, "intentId"),
+        workerId,
+      })
+    }
     case "notification":
       return { skipped: true, reason: "notification-jobs-not-used" }
     case "contact_import": {

@@ -77,7 +77,8 @@ sequenceDiagram
   Webhook->>DB: crm_ingest_whatsapp_inbound
   DB-->>Webhook: contact + conversation + message
   Webhook->>Registration: processa cadastro/comandos
-  DB->>Automation: domain events
+  DB->>Automation: workflow pré-autorizado
+  DB->>Router: domain event routing
 ```
 
 Código:
@@ -184,6 +185,45 @@ Código:
 - `src/lib/server/automation/jobs.ts`
 - `src/lib/server/automation/scoring.ts`
 
+### 4.6 Event Router + ações governadas
+
+```mermaid
+flowchart LR
+  E[Domain Event] --> R[Event Router]
+  R --> C[Capability Owner]
+  C --> P[Action Proposal]
+  P --> A[Authorization]
+  A --> I[Authorized Intent]
+  I --> X[Adapter Registry]
+  X --> H[Re-hydration]
+  H --> W[Write]
+  W --> V[Post-read Verify]
+  V --> RCPT[Execution Receipt]
+```
+
+**Proposal ≠ Authorization ≠ Execution.**
+
+O Router é usado para eventos sistêmicos, recomendações e ações propostas.  
+O Automation Engine continua separado para workflows explicitamente configurados pelo tenant.
+
+Código:
+- `src/lib/server/router/event-router.ts`
+- `src/lib/server/router/policy.ts`
+- `src/lib/server/router/capabilities.ts`
+- `src/lib/server/router/proposals.ts`
+- `src/lib/server/router/authorization.ts`
+- `src/lib/server/router/registry.ts`
+- `src/lib/server/router/execution.ts`
+- `src/lib/server/router/adapters/*`
+
+Banco:
+- `event_router_dispatches`
+- `action_proposals`
+- `authorized_intents`
+- `action_execution_receipts`
+
+Contrato completo: `docs/ROUTER.md`.
+
 ## 5. Mapa de domínio → código → banco
 
 | Domínio | Código principal | Tabelas / views |
@@ -203,6 +243,7 @@ Código:
 | Catálogo | catalog/ | catalog_items, price_books, price_book_items |
 | Pós-venda | reviews/, lifecycle | customer_transactions, review_requests |
 | Automação | automation/ | domain_events, automation_rules, automation_runs, job_queue |
+| Event Router | router/ | event_router_dispatches, action_proposals, authorized_intents, action_execution_receipts |
 | Outbound | outbound/ | outbound_messages, message_templates |
 | API pública | public-api/ + app/api/v1 | api_keys, usage_* |
 | Privacidade | privacy/ | privacy_requests |
@@ -222,10 +263,13 @@ flowchart TB
 
   DB --> EVENTS[domain_events]
   EVENTS --> JOBS[job_queue]
+  EVENTS --> ROUTER[Event Router]
   JOBS --> WORKER[Worker Tick]
 
   WORKER --> OUT[outbound processor]
   WORKER --> AUTO[automation engine]
+  WORKER --> ROUTER
+  WORKER --> EXEC[governed action executor]
   WORKER --> WEBHOOK[webhook processor]
   WORKER --> IMPORT[import processor]
 
@@ -291,8 +335,16 @@ Inbound, jobs, automações, webhooks, usage e importações precisam tolerar re
 ### Providers
 Domínio não conhece detalhes de WAHA/Resend. Provider é adapter.
 
+### Router
+- evento é gatilho, não autorização;
+- Action Proposal nunca executa diretamente;
+- Authorization não chama adapter;
+- execução governada exige adapter registrado;
+- write precisa de post-read verification;
+- `unknown` bloqueia replay cego.
+
 ### IA
-A IA é componente do CRM, não autoridade do banco. Nunca inventa ação executada e nunca substitui regra transacional.
+A IA é componente do CRM, não autoridade do banco. Pode criar Proposal, nunca Authorized Intent fingindo autoridade e nunca executa adapter diretamente.
 
 ### Independência
 Não introduzir dependência de Argoplace, MIRA ou VitalHub.
@@ -302,6 +354,9 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 | Quero mudar... | Comece por |
 |---|---|
 | regra de automação | `src/lib/server/automation/` |
+| roteamento de eventos/capabilities | `src/lib/server/router/policy.ts` + `capabilities.ts` |
+| ações propostas/autorizadas | `src/lib/server/router/` |
+| adapters governados | `src/lib/server/router/adapters/` |
 | envio WhatsApp | `src/lib/server/whatsapp/` + outbound |
 | conexão/QR WAHA | `src/lib/server/whatsapp/waha-admin.ts` |
 | envio e-mail | `src/lib/server/email/` |
@@ -328,6 +383,8 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 - consentimento/oportunidades;
 - Customer 360;
 - automações/jobs/outbox;
+- Event Router + capability owners;
+- Action Proposal → Authorized Intent → Adapter → Verify;
 - importação CSV;
 - API pública inicial;
 - privacidade;
@@ -349,11 +406,12 @@ Faltam principalmente:
 
 Antes de adicionar feature:
 
-1. identificar domínio;
+1. identificar domínio e capability owner;
 2. decidir tabela/evento;
 3. garantir `tenant_id`;
-4. decidir se há side effect;
-5. se houver side effect, usar job/outbox;
-6. definir idempotência;
-7. definir consentimento/segurança;
-8. atualizar este mapa se o fluxo estrutural mudar.
+4. decidir se é workflow pré-autorizado ou ação proposta;
+5. recomendação sistêmica/IA com write deve virar Action Proposal;
+6. side effect resiliente usa job/outbox;
+7. definir idempotência e verificação pós-write;
+8. definir consentimento/segurança;
+9. atualizar este mapa se o fluxo estrutural mudar.
