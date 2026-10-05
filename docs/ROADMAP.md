@@ -73,10 +73,10 @@
 
 ## Infra piloto
 - [ ] Supabase isolado
-- [ ] Vercel isolada
+- [x] Vercel isolada
 - [ ] login/onboarding
 - [ ] primeiro tenant
-- [ ] worker agendado
+- [x] worker agendado
 - [ ] WhatsApp real
 - [ ] Gemini assist
 
@@ -89,3 +89,12 @@ Adiado até estabilizar backend:
 - Pipeline Editor
 - Admin/configurações
 - dashboards
+
+
+## Infra atual
+- Vercel project `crm` ligado ao GitHub `andreydecorvital-sudo/CRM`
+- região padrão de Functions: `gru1`
+- Node.js: `22.x`
+- Cron: worker tick a cada minuto
+- secrets internos/worker armazenados na Vercel
+- Supabase isolado: aguardando criação no org selecionado
