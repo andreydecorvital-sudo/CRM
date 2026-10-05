@@ -171,27 +171,34 @@ alter table public.deals enable row level security;
 alter table public.whatsapp_connections enable row level security;
 alter table public.audit_log enable row level security;
 
-create or replace function public.is_tenant_member(p_tenant_id uuid)
-returns boolean language sql stable security definer set search_path=public as $$
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated, service_role;
+
+create or replace function private.is_tenant_member(p_tenant_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
   select exists(select 1 from public.tenant_members tm where tm.tenant_id = p_tenant_id and tm.user_id = auth.uid());
 $$;
 
-create policy "members read tenants" on public.tenants for select using (public.is_tenant_member(id));
-create policy "members read tenant_members" on public.tenant_members for select using (public.is_tenant_member(tenant_id));
-create policy "members contacts" on public.contacts for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
-create policy "members tags" on public.tags for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
+revoke all on function private.is_tenant_member(uuid) from public, anon;
+grant execute on function private.is_tenant_member(uuid) to authenticated, service_role;
+
+create policy "members read tenants" on public.tenants for select using (private.is_tenant_member(id));
+create policy "members read tenant_members" on public.tenant_members for select using (private.is_tenant_member(tenant_id));
+create policy "members contacts" on public.contacts for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
+create policy "members tags" on public.tags for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
 create policy "members contact_tags" on public.contact_tags for all
-using (exists(select 1 from public.contacts c where c.id=contact_id and public.is_tenant_member(c.tenant_id)))
-with check (exists(select 1 from public.contacts c where c.id=contact_id and public.is_tenant_member(c.tenant_id)));
-create policy "members conversations" on public.conversations for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
-create policy "members messages" on public.messages for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
-create policy "members pipelines" on public.pipelines for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
+using (exists(select 1 from public.contacts c where c.id=contact_id and private.is_tenant_member(c.tenant_id)))
+with check (exists(select 1 from public.contacts c where c.id=contact_id and private.is_tenant_member(c.tenant_id)));
+create policy "members conversations" on public.conversations for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
+create policy "members messages" on public.messages for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
+create policy "members pipelines" on public.pipelines for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
 create policy "members pipeline_stages" on public.pipeline_stages for all
-using (exists(select 1 from public.pipelines p where p.id=pipeline_id and public.is_tenant_member(p.tenant_id)))
-with check (exists(select 1 from public.pipelines p where p.id=pipeline_id and public.is_tenant_member(p.tenant_id)));
-create policy "members deals" on public.deals for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
-create policy "members whatsapp_connections" on public.whatsapp_connections for select using (public.is_tenant_member(tenant_id));
-create policy "members audit_log" on public.audit_log for select using (public.is_tenant_member(tenant_id));
+using (exists(select 1 from public.pipelines p where p.id=pipeline_id and private.is_tenant_member(p.tenant_id)))
+with check (exists(select 1 from public.pipelines p where p.id=pipeline_id and private.is_tenant_member(p.tenant_id)));
+create policy "members deals" on public.deals for all using (private.is_tenant_member(tenant_id)) with check (private.is_tenant_member(tenant_id));
+create policy "members whatsapp_connections" on public.whatsapp_connections for select using (private.is_tenant_member(tenant_id));
+create policy "members audit_log" on public.audit_log for select using (private.is_tenant_member(tenant_id));
 
 -- Ingestão idempotente via service role. Não expor a anon/authenticated.
 create or replace function public.crm_ingest_whatsapp_inbound(
@@ -207,7 +214,7 @@ create or replace function public.crm_ingest_whatsapp_inbound(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_contact public.contacts%rowtype;

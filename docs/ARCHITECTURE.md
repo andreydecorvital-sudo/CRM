@@ -3,45 +3,81 @@
 ## Princípios
 
 - SaaS multiempresa desde o banco.
-- WhatsApp é provider-neutral; WAHA é só o primeiro adapter.
-- MIRA nunca é dona do dado: conversa, lead, tarefa, proposta, compra e avaliação vivem no domínio CRM.
-- IA inicia em `assist`; `auto` só é habilitado por tenant e política.
-- Toda mensagem recebida é idempotente por conversa + external_id.
-- Segredos de provider ficam fora das tabelas em texto puro.
-- Decisões concorrentes importantes são atômicas no Postgres.
+- WhatsApp é provider-neutral.
+- MIRA não é dona do dado.
+- IA inicia em `assist`.
+- mensagens inbound são idempotentes.
+- decisões concorrentes críticas são atômicas no Postgres.
+- side effects externos passam por outbox/job queue.
+- segredos ficam fora do banco em texto puro.
 
-## Fluxo
+## Fluxo de negócio
 
-WhatsApp provider → webhook → contato/conversa → departamento/SLA → roteamento → MIRA/humano → deal → follow-up → proposta → venda → recorrência → avaliação → reativação.
+WhatsApp → contato/conversa → departamento/SLA → roteamento → MIRA/humano → deal → follow-up → proposta → venda → recorrência → avaliação → reativação.
 
-## Concorrência e atomicidade
+## Fluxo de automação
 
-### Roteamento
-`crm_route_conversation` bloqueia a conversa antes de escolher atendente. Evita dois workers distribuírem a mesma conversa simultaneamente.
+Mudança transacional → `domain_events` → `job_queue` → worker → scoring → regras → ações.
 
-### Proposta
-`crm_create_proposal` cria cabeçalho e itens na mesma transação. `crm_accept_proposal` bloqueia a proposta antes do aceite e é idempotente.
+Isso cria um transactional outbox: o evento nasce junto com a alteração que o originou e o side effect externo acontece depois.
 
-### Follow-up
-`deals.next_followup_at` sincroniza uma única tarefa automática por deal através de `automation_key`.
+## Durable jobs
 
-## Atribuição
+`crm_claim_jobs` usa `FOR UPDATE SKIP LOCKED`.
 
-`lead_attributions` preserva todos os touches. A view `contact_attribution` fornece first touch e last touch sem destruir o histórico intermediário.
+O ciclo é:
+- queued;
+- running;
+- succeeded;
+- retry;
+- dead.
 
-## SLA
+Locks abandonados podem ser liberados por `crm_release_stale_jobs`.
 
-Departamento define metas de primeira resposta/resolução. A conversa armazena deadlines calculados e a primeira mensagem outbound captura `first_response_at`.
+## Scoring
+
+`lead_score_rules` descreve a condição. `lead_score_events` registra por que o score mudou. `contact_scores` mantém o agregado e a classificação cold/warm/hot.
+
+## Consentimento
+
+`contact_channel_preferences` controla WhatsApp, email, SMS e telefone.
+
+A outbox bloqueia sales/marketing quando o contato está `opted_out` ou `transactional_only`.
+
+## Knowledge
+
+`knowledge_entries` usa índice GIN + full-text search em português. O objetivo inicial é recuperação barata e auditável para a MIRA.
+
+## Webhooks
+
+Eventos podem gerar `webhook_deliveries`. O worker usa HTTPS, timeout, retry e HMAC opcional.
+
+`secret_ref` aponta para variável de ambiente. Não armazena segredo.
+
+## API keys
+
+A chave completa é exibida uma vez. O banco mantém prefixo + SHA-256 + scopes.
+
+## Concorrência
+
+- roteamento: lock na conversa;
+- aceite de proposta: lock na proposta;
+- jobs: skip locked;
+- automações: unique rule/event;
+- scoring: event_key idempotente;
+- outbox: dedupe_key;
+- webhooks: unique subscription/event.
 
 ## Segurança
 
-- RLS em tabelas do schema público.
-- membership helper no schema `private`.
-- RPCs privilegiados executáveis apenas pelo `service_role`.
-- `SECURITY DEFINER` com `search_path = ''`.
-- views com `security_invoker = true`.
-- proposta e avaliação públicas usam token e endpoints server-side.
+- RLS em tabela pública;
+- views com security invoker;
+- helpers internos em schema private;
+- SECURITY DEFINER com search_path vazio;
+- RPCs privilegiados apenas para service_role;
+- worker protegido por secret;
+- CI fiscaliza migrations.
 
 ## Infra pendente
 
-O código está pronto para Supabase/Vercel isolados, mas migrations não devem ser aplicadas em projetos de outros produtos.
+Ainda falta o projeto Supabase e Vercel isolado do CRM. Nenhuma migration deve ser aplicada em banco de outro produto.

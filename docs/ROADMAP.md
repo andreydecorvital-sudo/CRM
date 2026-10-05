@@ -1,56 +1,66 @@
 # Roadmap de execução
 
-## Base concluída
-- [x] repo independente
+## Backend foundation concluída
 - [x] multi-tenant + RLS
-- [x] contatos, mensagens, inbox e auditoria
-- [x] pipeline, deals e tags
-- [x] adapter WAHA
-- [x] política de handoff da MIRA
-- [x] 253 · recorrência / LTV / VIP / risco
-- [x] 257 · avaliações / link público / cooldown
+- [x] contatos, mensagens, pipeline e deals
+- [x] WAHA adapter
+- [x] MIRA policy/handoff
 - [x] tarefas e follow-ups
-- [x] sincronização automática de follow-up do deal
 - [x] departamentos, SLA e roteamento
-- [x] first touch / last touch / UTM
-- [x] propostas com itens, totais, link público e aceite
-- [x] RPCs atômicos para roteamento e aceite
-- [x] hardening de RLS e SECURITY DEFINER
-- [x] CI de typecheck + build
+- [x] atribuição first/last touch
+- [x] propostas e aceite
+- [x] recorrência / LTV / VIP / risco
+- [x] avaliações
+- [x] customer timeline
+- [x] notas
+- [x] campos customizados tipados
+- [x] preferências por canal
+- [x] lead scoring
+- [x] knowledge base FTS
+- [x] domain events
+- [x] automation rules/runs
+- [x] durable job queue
+- [x] outbound message outbox
+- [x] webhooks outbound
+- [x] API keys + scopes
+- [x] worker interno
+- [x] migration security CI
 
-## Piloto vendável
-- [ ] Supabase isolado do CRM
-- [ ] Vercel do CRM
-- [ ] login, onboarding e convite de equipe
-- [ ] primeiro tenant real
-- [ ] inbox lendo dados reais
-- [ ] envio real pelo WhatsApp
-- [ ] QR/session por tenant
-- [ ] configuração visual de departamentos e SLA
-- [ ] cadastro real de pipeline
-- [ ] editor real de proposta
-- [ ] importação de contatos
-- [ ] MIRA gerar rascunho com Gemini
-- [ ] métricas reais no dashboard
+## Próxima camada de backend
+- [ ] accounts/empresas B2B
+- [ ] histórico de estágio e velocity
+- [ ] catálogo de produtos/serviços
+- [ ] importador CSV assíncrono
+- [ ] horário comercial/feriados
+- [ ] entitlements por plano
+- [ ] WhatsApp session/provider por tenant
+- [ ] API pública versionada
+- [ ] exportação LGPD / exclusão assistida
+- [ ] métricas agregadas e snapshots
 
-## Automação
-- [ ] classificador de intenção → departamento
-- [ ] resposta automática por política
-- [ ] horário comercial e feriados
-- [ ] worker de tarefas vencidas
-- [ ] worker de avaliações pendentes
-- [ ] campanhas de reativação
-- [ ] captura web de UTM/lead
-- [ ] webhooks de entrega/leitura do WhatsApp
-- [ ] alertas de SLA
+## Infra do piloto
+- [ ] Supabase isolado
+- [ ] Vercel isolada
+- [ ] login/onboarding
+- [ ] primeiro tenant
+- [ ] worker agendado
+- [ ] sessão WhatsApp real
+- [ ] Gemini assist mode
+
+## Frontend
+Adiado nesta fase. Depois do backend estabilizado:
+- inbox real;
+- builder de automações;
+- editor de pipeline;
+- editor de proposta;
+- configurações de SLA;
+- customer 360;
+- dashboards.
 
 ## Comercial
-- [ ] landing específica do CRM
+- [ ] landing CRM
 - [ ] planos e limites
 - [ ] billing
 - [ ] onboarding self-service
 - [ ] templates por segmento
-- [ ] demonstração com tenant fake isolado
-
-## Afiliados
-Produto/módulo separado. Pode reutilizar autenticação, tenants, filas, auditoria e scheduler, mas mantém domínio próprio.
+- [ ] tenant demo isolado

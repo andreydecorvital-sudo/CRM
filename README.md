@@ -10,21 +10,34 @@ CRM + atendimento + automação comercial multiempresa.
 - WhatsApp provider adapter (WAHA primeiro; Meta/BSP depois)
 - MIRA em modo assistido por padrão
 
-## Produto atual
+## Núcleo atual
 
 - Inbox WhatsApp e handoff humano
 - departamentos, filas, SLA e roteamento
 - CRM, contatos, tags, pipelines e deals
-- tarefas e follow-ups com sincronização automática do deal
+- tarefas e follow-ups sincronizados com o deal
 - origem / UTM com first touch e last touch
-- propostas com itens, desconto, link público, visualização e aceite
-- recorrência, LTV, ticket, VIP, risco e inatividade
-- avaliações pós-venda com cooldown
+- propostas com link público e aceite
+- recorrência, LTV, VIP, risco e inatividade
+- avaliações pós-venda
+- timeline unificada do cliente
+- notas e campos customizados
+- preferências/consentimento por canal
+- lead scoring configurável
+- base de conhecimento da MIRA com full-text search
+- eventos de domínio e motor de automações
+- outbox de mensagens com retry
+- webhooks outbound
+- API keys com hash e scopes
 - auditoria e isolamento multi-tenant
 
-O fluxo de produto é:
+Fluxo:
 
 `Origem → Lead → Atendimento → Tarefa → Proposta → Venda → Recorrência → Avaliação → Reativação`
+
+Por baixo, o backend opera:
+
+`Domain Event → Scoring → Automation Rules → Durable Job → Action/Outbox/Webhook`
 
 ## Rodar
 
@@ -34,28 +47,44 @@ npm install
 npm run dev
 ```
 
-Para um projeto Supabase novo e isolado, aplique as migrations na ordem:
+## Migrations
+
+Aplicar em projeto Supabase novo e isolado, na ordem:
 
 1. `202610050001_init_mira_crm.sql`
 2. `202610050002_customer_lifecycle_reviews.sql`
 3. `202610050003_commercial_operations.sql`
+4. `202610050004_customer_intelligence.sql`
+5. `202610050005_automation_platform.sql`
+
+## Worker
+
+O endpoint interno `/api/internal/jobs/tick` processa automações, mensagens outbound e webhooks.
+
+Proteja com `CRM_WORKER_SECRET`. Pode ser chamado por cron/worker externo depois da infraestrutura estar criada.
 
 ## Segurança
 
-Não copie secrets do VitalHub. Use um Supabase próprio e novas credenciais.
-
-- RLS nas tabelas expostas;
-- helper de membership em schema privado;
-- RPCs privilegiados restritos ao `service_role`;
-- `SECURITY DEFINER` com `search_path = ''`;
-- views com `security_invoker`;
-- links públicos usam tokens aleatórios e passam pelo servidor;
-- nenhum provider secret vai para o browser.
+- RLS nas tabelas públicas
+- views com `security_invoker`
+- helpers internos em schema `private`
+- `SECURITY DEFINER` com `search_path = ''`
+- RPCs privilegiados restritos ao `service_role`
+- nenhum secret de provider no browser
+- API keys armazenadas somente como hash
+- outbound respeita preferência de canal
+- CI valida migrations automaticamente
 
 ## CI
 
-O workflow `CRM CI` executa instalação, TypeScript e `next build` em push/PR.
+`CRM CI` executa:
 
-## Produto
+`typecheck → lint → migration security check → next build`
 
-Veja `docs/PRODUCT.md` e `docs/ARCHITECTURE.md`.
+## Documentação
+
+- `docs/PRODUCT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/BACKEND.md`
+- `docs/AUTOMATIONS.md`
+- `docs/ROADMAP.md`
