@@ -26,6 +26,20 @@ function authorized(request: Request) {
 async function handle(request: Request) {
   if (!authorized(request)) return Response.json({ error: "unauthorized" }, { status: 401 })
 
+  const supabaseReady = Boolean(
+    String(process.env.SUPABASE_URL || "").trim()
+    && String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
+  )
+  if (!supabaseReady) {
+    return Response.json({
+      ok: true,
+      skipped: true,
+      reason: "supabase_not_configured",
+    }, {
+      headers: { "Cache-Control": "no-store" },
+    })
+  }
+
   const url = new URL(request.url)
   const requestedLimit = Number(url.searchParams.get("limit") || 20)
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 25) : 20
