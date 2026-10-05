@@ -250,6 +250,7 @@ Contrato completo: `docs/ROUTER.md`.
 | Analytics | analytics/ | deal_stage_history, deal_velocity |
 | Billing SaaS | billing/ | tenant_subscriptions, usage_events, usage_counters |
 | IA | ai/ | knowledge entries + contexto do domínio |
+| Platform | platform/ + instrumentation | AI Gateway, PostHog, OTel/Langfuse |
 
 ## 6. Mapa técnico de runtime
 
@@ -275,6 +276,12 @@ flowchart TB
 
   OUT --> WAHA[WAHA]
   OUT --> EMAIL[Resend]
+
+  SERVICES --> PLATFORM[Shared Platform]
+  PLATFORM --> AIGW[LiteLLM AI Gateway]
+  PLATFORM --> PH[PostHog]
+  PLATFORM --> OTEL[OpenTelemetry]
+  OTEL --> LF[Langfuse]
 ```
 
 ## 7. WhatsApp lifecycle
@@ -346,6 +353,15 @@ Domínio não conhece detalhes de WAHA/Resend. Provider é adapter.
 ### IA
 A IA é componente do CRM, não autoridade do banco. Pode criar Proposal, nunca Authorized Intent fingindo autoridade e nunca executa adapter diretamente.
 
+### Shared Platform
+- produtos não chamam provider de IA diretamente;
+- LiteLLM/OpenAI-compatible gateway é a fronteira de modelos;
+- PostHog recebe analytics de produto sem PII/conteúdo;
+- OpenTelemetry é o padrão de tracing;
+- Langfuse observa IA/agentes atrás do OTel;
+- Supabase Queues/Cron/pgvector entram somente por caso validado;
+- tecnologia nova precisa passar pelo Tech Radar.
+
 ### Independência
 Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 
@@ -370,6 +386,9 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 | LGPD | `src/lib/server/privacy/` |
 | métricas SaaS | billing/entitlements |
 | IA | `src/lib/server/ai/` + knowledge |
+| gateway/modelos | `src/lib/server/platform/ai/gateway.ts` |
+| analytics de produto | `src/lib/server/platform/analytics/posthog.ts` |
+| observabilidade de IA | `src/lib/server/platform/observability/` + `src/instrumentation.ts` |
 
 ## 10. Estado atual do produto
 
@@ -389,7 +408,10 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 - API pública inicial;
 - privacidade;
 - analytics;
-- subscriptions/usage.
+- subscriptions/usage;
+- shared AI Gateway;
+- server-side product analytics;
+- OpenTelemetry/Langfuse AI tracing.
 
 ### Ainda não é produção comercial completa
 Faltam principalmente:

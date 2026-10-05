@@ -1,0 +1,31 @@
+# Shared AI Gateway example.
+# Do not commit provider keys. Keep this service separate from the CRM runtime.
+#
+# Current LiteLLM docs expose OpenAI-compatible endpoints such as:
+# /v1/chat/completions and /v1/responses.
+#
+# Replace upstream models according to provider availability before production.
+
+model_list:
+  - model_name: crm-default
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: crm-fast
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  fallbacks:
+    - crm-default:
+        - crm-fast
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+litellm_settings:
+  request_timeout: 45
+  num_retries: 2

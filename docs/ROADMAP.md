@@ -36,10 +36,25 @@
 - [x] privacy request/inventory/export
 - [x] business calendars/holidays
 - [x] migration security CI
+- [x] Tech Radar
+- [x] AI Gateway abstraction
+- [x] LiteLLM-compatible client
+- [x] PostHog server analytics foundation
+- [x] OpenTelemetry + Langfuse tracing foundation
 - [x] cadastro guiado de cliente pelo WhatsApp
 - [x] e-mail outbound por tenant
 - [x] consentimento específico de oportunidades
 - [x] comandos de opt-in/opt-out de oportunidades pelo WhatsApp
+
+## Shared platform próximo
+- [ ] provisionar LiteLLM real fora do runtime CRM
+- [ ] criar virtual key exclusiva do CRM
+- [ ] configurar PostHog
+- [ ] configurar Langfuse
+- [ ] validar Supabase Queues no projeto isolado
+- [ ] validar Supabase Cron no projeto isolado
+- [ ] piloto pgvector/hybrid search quando houver embedding real
+- [ ] Hermes Builder/Auditor com branch + PR
 
 ## Próximo backend
 - [x] importador CSV assíncrono

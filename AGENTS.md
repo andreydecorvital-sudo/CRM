@@ -4,8 +4,10 @@ Antes de alterar o projeto, leia:
 
 1. `docs/SYSTEM_MAP.md`
 2. `docs/ROUTER.md`
-3. `docs/ARCHITECTURE.md`
-4. o documento específico do domínio afetado.
+3. `docs/TECH_RADAR.md`
+4. `docs/PLATFORM_STACK.md`
+5. `docs/ARCHITECTURE.md`
+6. o documento específico do domínio afetado.
 
 ## Regras obrigatórias
 
@@ -24,6 +26,11 @@ Antes de alterar o projeto, leia:
 - Adapter é o único owner de uma mutação governada.
 - Write governado precisa de post-read verification; `unknown` impede replay cego.
 - Não criar um segundo Router/Action OS paralelo.
+- Produto não chama Gemini/OpenAI/Claude diretamente; usar `platform/ai/gateway.ts`.
+- Chaves reais dos providers de IA não ficam no runtime do produto.
+- Analytics não recebe prompt, mensagem, e-mail, telefone ou secrets.
+- Prompt/resposta em observabilidade é opt-in; padrão é metadata-only.
+- Tecnologia nova precisa passar pelo `docs/TECH_RADAR.md`.
 - Mudança estrutural exige atualização do `docs/SYSTEM_MAP.md`.
 
 ## Gates

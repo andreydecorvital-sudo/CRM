@@ -20,6 +20,9 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 - preferências/consentimento por canal
 - lead scoring explicável
 - base de conhecimento full-text para o motor de IA
+- AI Gateway provider-neutral via LiteLLM/OpenAI-compatible
+- tracing de IA via OpenTelemetry/Langfuse
+- product analytics server-side via PostHog
 - eventos de domínio e motor de automações
 - Event Router com capability owners
 - Action Proposal → Authorized Intent → Adapter → Verification
@@ -107,6 +110,9 @@ Veja `docs/WHATSAPP.md`.
 ## Docs
 
 - `docs/SYSTEM_MAP.md`
+- `docs/TECH_RADAR.md`
+- `docs/PLATFORM_STACK.md`
+- `docs/AI_GATEWAY.md`
 - `docs/ROUTER.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`
