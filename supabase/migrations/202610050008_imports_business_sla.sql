@@ -2509,7 +2509,7 @@ begin
       'kind',new.kind,
       'dueAt',new.due_at
     ),
-    'task-event:' || new.id::text || ':' || v_event_type || ':' || extract(epoch from new.updated_at)::bigint::text,
+    'task-event:' || new.id::text || ':' || v_event_type || ':' || txid_current()::text,
     new.updated_at
   );
 
@@ -2644,13 +2644,25 @@ begin
   )
     and p.status in ('proposed','awaiting_approval');
 
+  update public.authorized_intents i
+  set status = 'revoked'
+  where i.proposal_id in (
+    select n.action_proposal_id
+    from public.next_action_recommendations n
+    where n.tenant_id = new.tenant_id
+      and n.deal_id = new.id
+      and n.action_proposal_id is not null
+      and n.status = 'authorized'
+  )
+    and i.status = 'authorized';
+
   update public.next_action_recommendations
   set status = 'stale',
       resolved_at = v_now,
       updated_at = v_now
   where tenant_id = new.tenant_id
     and deal_id = new.id
-    and status in ('active','proposed');
+    and status in ('active','proposed','authorized');
 
   update public.revenue_recovery_cases
   set status = v_recovery_status,
