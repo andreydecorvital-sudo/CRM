@@ -5,8 +5,8 @@ import type {
   DealHealthInput,
   DealHealthResult,
   NextActionRecommendation,
-  RevenueRecoveryReason,
 } from "./types"
+import { assessRevenueRecovery } from "./recovery-assessment"
 
 type SnapshotRow = { id: string }
 type NextActionRow = {
@@ -18,44 +18,6 @@ type NextActionRow = {
 type RecoveryRow = {
   id: string
   status: string
-}
-
-function recoveryReason(health: DealHealthResult): RevenueRecoveryReason {
-  const codes = new Set(health.reasons.filter(reason => reason.points < 0).map(reason => reason.code))
-  if (codes.has("owner_missing")) return "owner_missing"
-  if (codes.has("customer_waiting") || codes.has("sla_breached")) return "customer_waiting"
-  if (codes.has("followup_overdue") || codes.has("task_overdue")) return "followup_overdue"
-  if (codes.has("proposal_unviewed") || codes.has("proposal_stale_after_view")) return "proposal_stalled"
-  if (codes.has("stage_stalled")) return "stage_stalled"
-  if (codes.has("conversation_stale")) return "conversation_stale"
-  return "multiple_risk_signals"
-}
-
-function daysStalled(health: DealHealthResult) {
-  return Math.max(
-    0,
-    Math.floor(health.signals.followupOverdueDays || 0),
-    Math.floor(health.signals.lastActivityAgeDays || 0),
-    Math.floor(health.signals.stageAgeDays || 0),
-  )
-}
-
-function recoverySummary(input: DealHealthInput, health: DealHealthResult, reason: RevenueRecoveryReason) {
-  const value = input.valueCents > 0
-    ? `R$ ${(input.valueCents / 100).toLocaleString("pt-BR",{ minimumFractionDigits:2 })}`
-    : "valor não informado"
-
-  const messages: Record<RevenueRecoveryReason,string> = {
-    owner_missing:`Deal “${input.title}” (${value}) está sem responsável.`,
-    customer_waiting:`Cliente do deal “${input.title}” (${value}) está aguardando retorno.`,
-    followup_overdue:`Deal “${input.title}” (${value}) perdeu a cadência de follow-up.`,
-    proposal_stalled:`Proposta do deal “${input.title}” (${value}) está parada.`,
-    stage_stalled:`Deal “${input.title}” (${value}) está acima do tempo esperado no estágio.`,
-    conversation_stale:`Deal “${input.title}” (${value}) está sem atividade comercial recente.`,
-    multiple_risk_signals:`Deal “${input.title}” (${value}) possui múltiplos sinais de risco.`,
-  }
-
-  return messages[reason]
 }
 
 export async function persistDealHealthSnapshot(input: {
@@ -214,10 +176,9 @@ export async function persistRevenueRecoveryCase(input: {
   nextActionStatus?: string | null
   fingerprint: string
 }) {
-  if (
-    input.deal.valueCents <= 0
-    || !["at_risk","critical"].includes(input.health.band)
-  ) {
+  const assessment = assessRevenueRecovery(input.deal,input.health)
+
+  if (!assessment.eligible || !assessment.reason || !assessment.severity) {
     await supabaseRest(
       "PATCH",
       `/revenue_recovery_cases?tenant_id=eq.${encodeURIComponent(input.deal.tenantId)}&deal_id=eq.${encodeURIComponent(input.deal.dealId)}&status=in.(open,proposed,authorized)`,
@@ -226,7 +187,7 @@ export async function persistRevenueRecoveryCase(input: {
     return null
   }
 
-  const reason = recoveryReason(input.health)
+  const reason = assessment.reason
   const recoveryKey = createHash("sha256")
     .update(`deal:${input.deal.dealId}:${reason}`)
     .digest("hex")
@@ -253,11 +214,11 @@ export async function persistRevenueRecoveryCase(input: {
   const row = {
     health_snapshot_id:input.healthSnapshotId,
     next_action_id:input.nextActionId || null,
-    severity:input.health.band,
-    pipeline_value_cents:input.deal.valueCents,
-    exposed_value_cents:input.deal.valueCents,
-    days_stalled:daysStalled(input.health),
-    summary:recoverySummary(input.deal,input.health,reason),
+    severity:assessment.severity,
+    pipeline_value_cents:assessment.pipelineValueCents,
+    exposed_value_cents:assessment.exposedValueCents,
+    days_stalled:assessment.daysStalled,
+    summary:assessment.summary,
     evidence:input.health.reasons.filter(item => item.points < 0),
     status:recoveryStatus,
     metadata:{

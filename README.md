@@ -42,6 +42,7 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 - Deal Health Score explicável
 - Revenue Recovery / pipeline exposto
 - Next Action Recommendations governadas pelo Router
+- Simulation/Eval Lab com golden scenarios
 - subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
 
@@ -108,7 +109,7 @@ Veja `docs/WHATSAPP.md`.
 
 ## CI
 
-`typecheck → lint → migration security check → next build`
+`typecheck → lint → tests → migration security check → next build`
 
 ## Docs
 
@@ -117,6 +118,7 @@ Veja `docs/WHATSAPP.md`.
 - `docs/PLATFORM_STACK.md`
 - `docs/AI_GATEWAY.md`
 - `docs/COMMERCIAL_INTELLIGENCE.md`
+- `docs/SIMULATION_LAB.md`
 - `docs/ROUTER.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`

@@ -45,6 +45,9 @@
 - [x] Revenue Recovery Engine v1
 - [x] Next Action Engine v1
 - [x] Commercial Intelligence reativo via Domain Events
+- [x] Simulation/Eval Lab
+- [x] golden scenarios de inteligência comercial
+- [x] testes automatizados de domínio no CI
 - [x] cadastro guiado de cliente pelo WhatsApp
 - [x] e-mail outbound por tenant
 - [x] consentimento específico de oportunidades

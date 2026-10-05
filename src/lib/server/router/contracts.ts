@@ -96,7 +96,7 @@ export type AuthorizedIntent = {
   payload: Record<string, unknown>
   proposal_snapshot: Record<string, unknown>
   status: "authorized" | "rejected" | "expired" | "revoked"
-  authorization_source: "policy" | "human" | "system"
+  authorization_source: "policy" | "human"
   authorized_by: string | null
   authorization_reason: string | null
   authorization_granted: boolean

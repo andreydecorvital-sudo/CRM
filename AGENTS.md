@@ -5,10 +5,11 @@ Antes de alterar o projeto, leia:
 1. `docs/SYSTEM_MAP.md`
 2. `docs/ROUTER.md`
 3. `docs/COMMERCIAL_INTELLIGENCE.md`
-4. `docs/TECH_RADAR.md`
-5. `docs/PLATFORM_STACK.md`
-6. `docs/ARCHITECTURE.md`
-7. o documento específico do domínio afetado.
+4. `docs/SIMULATION_LAB.md`
+5. `docs/TECH_RADAR.md`
+6. `docs/PLATFORM_STACK.md`
+7. `docs/ARCHITECTURE.md`
+8. o documento específico do domínio afetado.
 
 ## Regras obrigatórias
 
@@ -35,12 +36,13 @@ Antes de alterar o projeto, leia:
 - Deal Health deve permanecer explicável; não esconder score atrás de IA.
 - “Receita em risco” não pode ser apresentada como “receita recuperável” sem modelo histórico validado.
 - Next Action nunca faz write direto; usa Action Proposal.
+- Mudança em Deal Health/Recovery/Next Action deve manter ou atualizar conscientemente os golden scenarios.
 - Mudança estrutural exige atualização do `docs/SYSTEM_MAP.md`.
 
 ## Gates
 
 Todo commit relevante deve passar:
 
-`typecheck → lint → migration security check → next build`
+`typecheck → lint → tests → migration security check → next build`
 
 Não declarar uma feature pronta se o CI estiver vermelho.

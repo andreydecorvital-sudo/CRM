@@ -256,6 +256,8 @@ Código:
 - `src/lib/server/intelligence/revenue-recovery.ts`
 - `src/lib/server/intelligence/scanner.ts`
 - `src/lib/server/intelligence/summary.ts`
+- `src/lib/server/intelligence/simulator.ts`
+- `src/lib/server/intelligence/scenarios.ts`
 
 Banco:
 - `deal_health_snapshots`
@@ -265,6 +267,8 @@ Banco:
 - `revenue_recovery_summary`
 
 Contrato completo: `docs/COMMERCIAL_INTELLIGENCE.md`.
+
+O comportamento crítico também é validado sem banco por `docs/SIMULATION_LAB.md`.
 
 ## 5. Mapa de domínio → código → banco
 
@@ -472,13 +476,15 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 ### Ainda não é produção comercial completa
 Faltam principalmente:
 - Supabase isolado implantado;
-- Vercel isolada;
+- Vercel isolada implantada;
 - auth/onboarding;
 - WAHA real provisionado em infraestrutura;
-- worker agendado real;
+- worker agendado real implantado;
 - billing provider;
 - testes E2E e observabilidade;
 - frontend final.
+
+Já existe Simulation/Eval Lab independente do banco para validar regras de domínio e Router.
 
 ## 11. Regra para novas implementações
 
