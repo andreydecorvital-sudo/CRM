@@ -32,6 +32,10 @@
 - [x] privacy request/inventory/export
 - [x] business calendars/holidays
 - [x] migration security CI
+- [x] cadastro guiado de cliente pelo WhatsApp
+- [x] e-mail outbound por tenant
+- [x] consentimento específico de oportunidades
+- [x] comandos de opt-in/opt-out de oportunidades pelo WhatsApp
 
 ## Próximo backend
 - [x] importador CSV assíncrono

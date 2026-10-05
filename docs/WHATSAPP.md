@@ -48,3 +48,14 @@ Isso impede que o domínio CRM dependa diretamente de WAHA e permite adicionar M
 - health check
 - reconnect policy
 - Meta Cloud API/Embedded Signup como provider oficial
+
+
+## Webhook inbound
+
+O webhook WAHA usa o header:
+
+```
+x-crm-webhook-secret: <WHATSAPP_WEBHOOK_SECRET>
+```
+
+Depois da ingestão idempotente, o backend pode avançar o cadastro guiado e processar comandos de preferência do próprio contato.

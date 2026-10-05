@@ -124,7 +124,7 @@ export async function executeAutomationAction(action: AutomationAction, context:
       const purpose = str(rendered.purpose) || "support"
       if (!contactId || !body) throw new Error("message.queue exige contato e corpo.")
       if (!["whatsapp","email","sms"].includes(channel)) throw new Error("Canal de mensagem inválido.")
-      if (!["transactional","support","sales","marketing"].includes(purpose)) throw new Error("Finalidade de mensagem inválida.")
+      if (!["transactional","support","sales","marketing","opportunity"].includes(purpose)) throw new Error("Finalidade de mensagem inválida.")
 
       const result = await supabaseRest<Record<string, unknown>[]>("POST", "/outbound_messages", [{
         tenant_id: context.event.tenant_id,
@@ -132,7 +132,9 @@ export async function executeAutomationAction(action: AutomationAction, context:
         conversation_id: uuid(rendered.conversationId),
         channel,
         purpose,
+        subject: str(rendered.subject,500) || null,
         body,
+        html_body: str(rendered.html,12000) || null,
         status: "pending",
         scheduled_at: str(rendered.scheduledAt) || new Date().toISOString(),
         dedupe_key: automationDedupe(context, "message"),

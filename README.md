@@ -25,6 +25,9 @@ Backend de CRM + atendimento + automação comercial multiempresa.
 - calendários comerciais e feriados
 - importação CSV assíncrona com retry e progresso
 - SLA contado em horário comercial
+- cadastro guiado de cliente pelo WhatsApp
+- disparo de e-mail por tenant via outbox
+- consentimento específico para oportunidades por canal
 - histórico de etapa, velocity e atribuições
 - subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
@@ -48,6 +51,7 @@ Aplicar apenas em um Supabase dedicado ao CRM, na ordem:
 5. `202610050005_automation_platform.sql`
 6. `202610050006_saas_business_foundation.sql`
 7. `202610050007_api_privacy_calendars.sql`
+8. `202610050008_imports_business_sla.sql`
 
 ## Worker
 
@@ -100,4 +104,7 @@ Veja `docs/WHATSAPP.md`.
 - `docs/WHATSAPP.md`
 - `docs/IMPORTS.md`
 - `docs/BUSINESS_HOURS.md`
+- `docs/CUSTOMER_REGISTRATION.md`
+- `docs/EMAIL.md`
+- `docs/OPPORTUNITIES.md`
 - `docs/ROADMAP.md`
