@@ -12,18 +12,21 @@ for (const { name, text } of contents) {
     errors.push(`${name}: SECURITY DEFINER/search_path não pode usar public.`)
   }
 
-  let cursor = 0
-  while (true) {
-    const index = text.toLowerCase().indexOf("security definer", cursor)
-    if (index < 0) break
-    const window = text.slice(index, index + 220).toLowerCase()
-    if (!window.includes("set search_path = ''")) {
-      errors.push(`${name}: SECURITY DEFINER sem search_path vazio perto da posição ${index}.`)
+  const functionStarts = [...text.matchAll(/create\s+(?:or\s+replace\s+)?function\s+/gi)]
+  for (const match of functionStarts) {
+    const start = match.index ?? 0
+    const end = text.indexOf("$$;", start)
+    if (end < 0) {
+      errors.push(`${name}: função iniciada na posição ${start} sem fechamento $$;.`)
+      continue
     }
-    cursor = index + 16
+    const block = text.slice(start, end + 3)
+    if (/security\s+definer/i.test(block) && !/set\s+search_path\s*=\s*''/i.test(block)) {
+      errors.push(`${name}: SECURITY DEFINER sem search_path vazio na função iniciada em ${start}.`)
+    }
   }
 
-  const publicDefiners = [...text.matchAll(/create\s+or\s+replace\s+function\s+public\.([a-zA-Z0-9_]+)[\s\S]{0,700}?security\s+definer/gi)]
+  const publicDefiners = [...text.matchAll(/create\s+(?:or\s+replace\s+)?function\s+public\.([a-zA-Z0-9_]+)[\s\S]{0,900}?security\s+definer/gi)]
   for (const match of publicDefiners) {
     const fn = match[1]
     const revokePattern = new RegExp(`revoke\\s+(?:all|execute)\\s+on\\s+function\\s+public\\.${fn}\\s*\\(`, "i")
@@ -35,7 +38,7 @@ for (const { name, text } of contents) {
   const views = [...text.matchAll(/create\s+or\s+replace\s+view\s+public\.([a-zA-Z0-9_]+)/gi)]
   for (const match of views) {
     const start = match.index ?? 0
-    const window = text.slice(start, start + 220).toLowerCase()
+    const window = text.slice(start, start + 260).toLowerCase()
     if (!window.includes("security_invoker = true")) {
       errors.push(`${name}: view public.${match[1]} sem security_invoker = true.`)
     }
