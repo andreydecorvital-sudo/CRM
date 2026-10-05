@@ -52,6 +52,7 @@
 - [x] Workflow Simulator
 - [x] Activation Gate por simulation approval
 - [x] templates iniciais de playbook
+- [x] authoring em linguagem natural via AI Gateway (draft-only)
 - [x] cadastro guiado de cliente pelo WhatsApp
 - [x] e-mail outbound por tenant
 - [x] consentimento específico de oportunidades

@@ -223,15 +223,28 @@ A implementação atual não possui endpoint para publicar/ativar no banco propo
 
 Antes do Supabase real, estamos validando o contrato e o comportamento.
 
-## IA futura
+## Authoring em linguagem natural
 
-O AI Gateway poderá converter linguagem natural em `PlaybookDefinition`.
+O AI Gateway já pode converter linguagem natural em `PlaybookDefinition` através de `draftPlaybookFromText()`.
 
 Exemplo:
 
 > “Quando entrar lead do Meta acima de 5 mil, marque como alto ticket e crie follow-up em 30 minutos.”
 
-A IA só produz um **draft estruturado**.
+A IA só produz um **draft estruturado**, e o backend força `mode=draft` mesmo que o modelo tente retornar outro modo.
+
+Endpoint interno:
+
+```json
+POST /api/internal/playbooks
+{
+  "operation":"draft_from_text",
+  "tenantId":"...",
+  "instruction":"Quando entrar lead do Meta acima de 5 mil, marque como alto ticket e crie follow-up em 30 minutos."
+}
+```
+
+Depende do AI Gateway configurado. Sem gateway, o authoring falha isoladamente e os templates/simulador continuam funcionando.
 
 Ela não:
 - ativa playbook;

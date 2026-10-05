@@ -1,5 +1,6 @@
 import { assertInternalRequest } from "@/lib/server/internal-auth"
 import { compilePlaybook } from "@/lib/server/playbooks/compiler"
+import { draftPlaybookFromText } from "@/lib/server/playbooks/authoring"
 import { getPlaybookTemplate, playbookTemplates } from "@/lib/server/playbooks/templates"
 import { simulatePlaybook } from "@/lib/server/playbooks/simulator"
 import type {
@@ -76,6 +77,21 @@ export async function POST(request: Request) {
     const template = templateKey ? getPlaybookTemplate(templateKey) : null
     const playbook = template || playbookFrom(body.playbook)
 
+    if (operation === "draft_from_text") {
+      const tenantId = String(body.tenantId || "").trim()
+      const instruction = String(body.instruction || "").trim()
+      if (!tenantId) throw new Error("tenantId obrigatório para draft_from_text.")
+      if (!instruction) throw new Error("instruction obrigatória.")
+
+      return Response.json({
+        ok:true,
+        operation,
+        draft:await draftPlaybookFromText({ tenantId,instruction }),
+      },{
+        headers:{ "Cache-Control":"no-store" },
+      })
+    }
+
     if (operation === "validate") {
       return Response.json({
         ok:true,
@@ -112,7 +128,7 @@ export async function POST(request: Request) {
       })
     }
 
-    throw new Error("operation inválida. Use validate, compile ou simulate.")
+    throw new Error("operation inválida. Use draft_from_text, validate, compile ou simulate.")
   } catch (error) {
     return fail(error)
   }

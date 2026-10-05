@@ -211,6 +211,7 @@ Código:
 - `src/lib/server/playbooks/compiler.ts`
 - `src/lib/server/playbooks/simulator.ts`
 - `src/lib/server/playbooks/templates.ts`
+- `src/lib/server/playbooks/authoring.ts`
 
 Contrato: `docs/PLAYBOOKS.md`.
 
