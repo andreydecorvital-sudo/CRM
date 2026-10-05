@@ -157,18 +157,20 @@ describe("Playbook Engine",() => {
   })
 
   it("forces AI-authored playbooks to draft even if the model asks for active",() => {
-    const raw = ```json
-{
-  "key":"meta-high-ticket",
-  "name":"Meta high ticket",
-  "description":"draft",
-  "triggerEvent":"deal.created",
-  "conditions":{"all":[{"path":"payload.valueCents","op":"gte","value":500000}]},
-  "actions":[{"type":"contact.tag","params":{"tag":"high-ticket"}}],
-  "mode":"active",
-  "priority":10
-}
-```
+    const raw = [
+      "```json",
+      "{",
+      '  "key":"meta-high-ticket",',
+      '  "name":"Meta high ticket",',
+      '  "description":"draft",',
+      '  "triggerEvent":"deal.created",',
+      '  "conditions":{"all":[{"path":"payload.valueCents","op":"gte","value":500000}]},',
+      '  "actions":[{"type":"contact.tag","params":{"tag":"high-ticket"}}],',
+      '  "mode":"active",',
+      '  "priority":10',
+      "}",
+      "```",
+    ].join("\n")
 
     const draft = parsePlaybookDraftFromModelText(raw)
     expect(draft.mode).toBe("draft")
