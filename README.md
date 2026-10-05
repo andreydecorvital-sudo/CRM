@@ -43,6 +43,7 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 - Revenue Recovery / pipeline exposto
 - Next Action Recommendations governadas pelo Router
 - Simulation/Eval Lab com golden scenarios
+- Playbook Engine + Workflow Simulator
 - subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
 
@@ -119,6 +120,7 @@ Veja `docs/WHATSAPP.md`.
 - `docs/AI_GATEWAY.md`
 - `docs/COMMERCIAL_INTELLIGENCE.md`
 - `docs/SIMULATION_LAB.md`
+- `docs/PLAYBOOKS.md`
 - `docs/ROUTER.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`

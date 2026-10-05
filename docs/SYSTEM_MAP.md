@@ -190,7 +190,31 @@ Código:
 - `src/lib/server/automation/jobs.ts`
 - `src/lib/server/automation/scoring.ts`
 
-### 4.6 Event Router + ações governadas
+### 4.6 Playbook Engine + Workflow Simulator
+
+```mermaid
+flowchart LR
+  INTENT[Regra comercial] --> PLAYBOOK[Playbook]
+  PLAYBOOK --> VALIDATE[Validate]
+  VALIDATE --> SIM[Simulate]
+  SIM --> REVIEW[Review impact]
+  REVIEW --> COMPILE[Compile]
+  COMPILE --> RULE[Automation Rule]
+  RULE --> AUTO[Automation Engine]
+```
+
+Playbook é camada de produto, não um segundo motor.
+
+Código:
+- `src/lib/server/playbooks/types.ts`
+- `src/lib/server/playbooks/validator.ts`
+- `src/lib/server/playbooks/compiler.ts`
+- `src/lib/server/playbooks/simulator.ts`
+- `src/lib/server/playbooks/templates.ts`
+
+Contrato: `docs/PLAYBOOKS.md`.
+
+### 4.7 Event Router + ações governadas
 
 ```mermaid
 flowchart LR
@@ -229,7 +253,7 @@ Banco:
 
 Contrato completo: `docs/ROUTER.md`.
 
-### 4.7 Commercial Intelligence
+### 4.8 Commercial Intelligence
 
 ```mermaid
 flowchart LR
@@ -289,6 +313,7 @@ O comportamento crítico também é validado sem banco por `docs/SIMULATION_LAB.
 | Catálogo | catalog/ | catalog_items, price_books, price_book_items |
 | Pós-venda | reviews/, lifecycle | customer_transactions, review_requests |
 | Automação | automation/ | domain_events, automation_rules, automation_runs, job_queue |
+| Playbooks | playbooks/ | compila para automation_rules; simulação sem banco |
 | Event Router | router/ | event_router_dispatches, action_proposals, authorized_intents, action_execution_receipts |
 | Outbound | outbound/ | outbound_messages, message_templates |
 | API pública | public-api/ + app/api/v1 | api_keys, usage_* |
@@ -390,6 +415,13 @@ Inbound, jobs, automações, webhooks, usage e importações precisam tolerar re
 ### Providers
 Domínio não conhece detalhes de WAHA/Resend. Provider é adapter.
 
+### Playbooks
+- não criar workflow engine paralelo;
+- draft/shadow compilam desabilitados;
+- active exige `simulationApproved=true`;
+- simulação usa as mesmas condições/templates do runtime;
+- impacto de mensagem precisa considerar consentimento.
+
 ### Commercial Intelligence
 - score precisa ser explicável;
 - valor exposto não é promessa de recuperação;
@@ -426,6 +458,7 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 | Quero mudar... | Comece por |
 |---|---|
 | regra de automação | `src/lib/server/automation/` |
+| playbook/simulação | `src/lib/server/playbooks/` |
 | roteamento de eventos/capabilities | `src/lib/server/router/policy.ts` + `capabilities.ts` |
 | ações propostas/autorizadas | `src/lib/server/router/` |
 | adapters governados | `src/lib/server/router/adapters/` |
@@ -464,6 +497,7 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 - Deal Health Score explicável;
 - Revenue Recovery Engine;
 - Next Action Engine;
+- Playbook Engine + Workflow Simulator;
 - importação CSV;
 - API pública inicial;
 - privacidade;

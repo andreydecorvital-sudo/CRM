@@ -6,10 +6,11 @@ Antes de alterar o projeto, leia:
 2. `docs/ROUTER.md`
 3. `docs/COMMERCIAL_INTELLIGENCE.md`
 4. `docs/SIMULATION_LAB.md`
-5. `docs/TECH_RADAR.md`
-6. `docs/PLATFORM_STACK.md`
-7. `docs/ARCHITECTURE.md`
-8. o documento específico do domínio afetado.
+5. `docs/PLAYBOOKS.md`
+6. `docs/TECH_RADAR.md`
+7. `docs/PLATFORM_STACK.md`
+8. `docs/ARCHITECTURE.md`
+9. o documento específico do domínio afetado.
 
 ## Regras obrigatórias
 
@@ -37,6 +38,8 @@ Antes de alterar o projeto, leia:
 - “Receita em risco” não pode ser apresentada como “receita recuperável” sem modelo histórico validado.
 - Next Action nunca faz write direto; usa Action Proposal.
 - Mudança em Deal Health/Recovery/Next Action deve manter ou atualizar conscientemente os golden scenarios.
+- Playbook não cria um segundo motor de automação; deve compilar para `AutomationRule`.
+- `mode=active` exige simulação aprovada explicitamente.
 - Mudança estrutural exige atualização do `docs/SYSTEM_MAP.md`.
 
 ## Gates

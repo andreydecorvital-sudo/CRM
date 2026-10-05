@@ -48,6 +48,10 @@
 - [x] Simulation/Eval Lab
 - [x] golden scenarios de inteligência comercial
 - [x] testes automatizados de domínio no CI
+- [x] Playbook Engine
+- [x] Workflow Simulator
+- [x] Activation Gate por simulation approval
+- [x] templates iniciais de playbook
 - [x] cadastro guiado de cliente pelo WhatsApp
 - [x] e-mail outbound por tenant
 - [x] consentimento específico de oportunidades
@@ -71,7 +75,8 @@
 - [ ] anonimização/exclusão LGPD assistida
 - [x] snapshots de Deal Health
 - [ ] snapshots agregados de analytics
-- [ ] templates de automações por segmento
+- [x] templates iniciais de automação/playbook
+- [ ] templates verticais por segmento
 - [ ] billing provider
 
 ## Infra piloto
