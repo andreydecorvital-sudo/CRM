@@ -1,58 +1,43 @@
 # MIRA CRM
 
-CRM + atendimento + automação comercial multiempresa.
+Backend de CRM + atendimento + automação comercial multiempresa.
 
-## Stack
+## O que já existe no domínio
 
-- Next.js 16 / React 19
-- Supabase Postgres + Auth + RLS
-- Vercel
-- WhatsApp provider adapter
-- MIRA em modo assistido por padrão
-
-## Núcleo atual
-
-- Inbox, SLA, departamentos e roteamento
-- CRM, contatos, tags, pipelines e deals
-- tarefas e follow-ups sincronizados
-- origem / UTM first touch + last touch
-- propostas públicas e aceite
+- contatos, empresas B2B, tags e Customer 360
+- WhatsApp provider-neutral com configuração por tenant
+- conversas, departamentos, filas, SLA e roteamento
+- pipelines, deals, tarefas e follow-up
+- catálogo, tabelas de preço e propostas
+- UTM / first touch / last touch
 - recorrência, LTV, VIP, risco e avaliações
-- timeline, notas e campos customizados
-- consentimento/preferências por canal
-- lead scoring configurável
+- timeline, notas e custom fields
+- preferências/consentimento por canal
+- lead scoring explicável
 - base de conhecimento full-text para MIRA
-- domain events + motor de automações
-- durable job queue + retry/dead jobs
+- eventos de domínio e motor de automações
+- durable jobs, retry e dead jobs
 - outbox de mensagens
-- webhooks outbound
-- API keys com hash + scopes
-- empresas/contas B2B
-- catálogo, tabelas de preço e vínculo com proposta
-- histórico de etapa e velocity
-- histórico de atribuição de conversas
-- planos, features, limites e medição de uso
+- webhooks outbound com HMAC
+- API keys com scopes
+- API pública v1 inicial
+- workflows de privacidade/exportação
+- calendários comerciais e feriados
+- histórico de etapa, velocity e atribuições
+- subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
 
-Fluxo de negócio:
+## Fluxo
 
 `Origem → Lead → Atendimento → Tarefa → Proposta → Venda → Recorrência → Avaliação → Reativação`
 
-Fluxo técnico:
+Backend:
 
 `Domain Event → Scoring → Automation Rule → Durable Job → Action / Outbox / Webhook`
 
-## Rodar
-
-```bash
-cp .env.example .env.local
-npm install
-npm run dev
-```
-
 ## Migrations
 
-Aplicar em projeto Supabase novo e isolado, na ordem:
+Aplicar apenas em um Supabase dedicado ao CRM, na ordem:
 
 1. `202610050001_init_mira_crm.sql`
 2. `202610050002_customer_lifecycle_reviews.sql`
@@ -60,6 +45,7 @@ Aplicar em projeto Supabase novo e isolado, na ordem:
 4. `202610050004_customer_intelligence.sql`
 5. `202610050005_automation_platform.sql`
 6. `202610050006_saas_business_foundation.sql`
+7. `202610050007_api_privacy_calendars.sql`
 
 ## Worker
 
@@ -67,15 +53,34 @@ Aplicar em projeto Supabase novo e isolado, na ordem:
 
 Proteção: `CRM_WORKER_SECRET`.
 
+## API pública
+
+Primeiras rotas:
+
+- `GET /api/v1/contacts`
+- `POST /api/v1/contacts`
+- `POST /api/v1/events`
+
+API key define tenant + scopes; o cliente nunca informa tenant arbitrariamente.
+
+Veja `docs/API.md`.
+
+## WhatsApp
+
+Conexões são resolvidas por tenant. Fallback WAHA global é desabilitado por padrão e só existe para piloto controlado.
+
+Veja `docs/WHATSAPP.md`.
+
 ## Segurança
 
 - RLS em toda tabela pública
 - views com `security_invoker`
 - helpers em schema `private`
 - `SECURITY DEFINER` com `search_path = ''`
-- RPCs privilegiados restritos ao `service_role`
-- API keys armazenadas só como hash
-- outbox respeita opt-out
+- RPC privilegiada apenas para `service_role`
+- API keys armazenadas como hash
+- opt-out aplicado antes do provider
+- secrets referenciados por nome, não em texto no banco
 - CI valida migrations
 
 ## CI
@@ -88,4 +93,7 @@ Proteção: `CRM_WORKER_SECRET`.
 - `docs/ARCHITECTURE.md`
 - `docs/BACKEND.md`
 - `docs/AUTOMATIONS.md`
+- `docs/API.md`
+- `docs/PRIVACY.md`
+- `docs/WHATSAPP.md`
 - `docs/ROADMAP.md`

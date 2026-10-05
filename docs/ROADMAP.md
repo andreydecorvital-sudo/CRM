@@ -4,6 +4,7 @@
 - [x] multi-tenant + RLS
 - [x] CRM/deals/pipeline
 - [x] WhatsApp adapter
+- [x] WhatsApp provider/config por tenant
 - [x] tarefas/follow-up
 - [x] SLA/filas/roteamento
 - [x] UTM first/last touch
@@ -20,23 +21,26 @@
 - [x] durable job queue
 - [x] outbox
 - [x] webhooks
-- [x] API keys
+- [x] API keys/scopes
+- [x] API pública v1 inicial
 - [x] accounts B2B
 - [x] catálogo/price books
 - [x] histórico de estágio/velocity
 - [x] histórico de atribuição
 - [x] subscriptions/features/limits
 - [x] usage metering
+- [x] privacy request/inventory/export
+- [x] business calendars/holidays
 - [x] migration security CI
 
 ## Próximo backend
 - [ ] importador CSV assíncrono
-- [ ] business hours/feriados
-- [ ] provider/session WhatsApp por tenant
-- [ ] API pública v1
-- [ ] LGPD export/delete workflow
+- [ ] cálculo de SLA em horário comercial
+- [ ] provisioning/status/QR de sessão WhatsApp por tenant
+- [ ] API v1 de deals/tasks/propostas
+- [ ] anonimização/exclusão LGPD assistida
 - [ ] snapshots de analytics
-- [ ] catálogo de automações/templates por segmento
+- [ ] templates de automações por segmento
 - [ ] billing provider
 
 ## Infra piloto
@@ -50,10 +54,10 @@
 
 ## Frontend
 Adiado até estabilizar backend:
-- customer 360
-- inbox real
-- automation builder
-- proposal editor
-- pipeline editor
-- admin/configurações
+- Customer 360
+- Inbox real
+- Automation Builder
+- Proposal Editor
+- Pipeline Editor
+- Admin/configurações
 - dashboards

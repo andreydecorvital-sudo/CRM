@@ -1,4 +1,4 @@
-import { WahaProvider } from "@/lib/server/whatsapp/providers/waha"
+import { createWhatsappProviderForTenant } from "@/lib/server/whatsapp/provider-factory"
 import { supabaseRest } from "@/lib/server/supabase/rest"
 import { recordUsage } from "@/lib/server/billing/entitlements"
 
@@ -92,7 +92,7 @@ export async function processOutboundMessage(messageId: string) {
   })
 
   try {
-    const provider = new WahaProvider()
+    const provider = await createWhatsappProviderForTenant(message.tenant_id)
     const sent = await provider.sendText({
       tenantId: message.tenant_id,
       to: whatsappTarget(contact, message.metadata),
