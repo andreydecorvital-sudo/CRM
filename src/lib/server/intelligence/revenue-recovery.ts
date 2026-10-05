@@ -197,7 +197,7 @@ export async function persistNextAction(input: {
     priority:input.recommendation.priority,
     payload,
     evidence:input.recommendation.evidence,
-    status:recoveryStatus,
+    status:"proposed",
     action_proposal_id:proposal.id,
     proposed_at:input.deal.now,
   }])
@@ -220,7 +220,7 @@ export async function persistRevenueRecoveryCase(input: {
   ) {
     await supabaseRest(
       "PATCH",
-      `/revenue_recovery_cases?tenant_id=eq.${encodeURIComponent(input.deal.tenantId)}&deal_id=eq.${encodeURIComponent(input.deal.dealId)}&status=in.(open,proposed)`,
+      `/revenue_recovery_cases?tenant_id=eq.${encodeURIComponent(input.deal.tenantId)}&deal_id=eq.${encodeURIComponent(input.deal.dealId)}&status=in.(open,proposed,authorized)`,
       { status:"stale",resolved_at:input.deal.now,updated_at:input.deal.now },
     ).catch(() => null)
     return null
@@ -259,7 +259,7 @@ export async function persistRevenueRecoveryCase(input: {
     days_stalled:daysStalled(input.health),
     summary:recoverySummary(input.deal,input.health,reason),
     evidence:input.health.reasons.filter(item => item.points < 0),
-    status:"proposed",
+    status:recoveryStatus,
     metadata:{
       healthFingerprint:input.fingerprint,
       algorithmVersion:"deal-health-v1",
