@@ -7,37 +7,40 @@ CRM + atendimento + automação comercial multiempresa.
 - Next.js 16 / React 19
 - Supabase Postgres + Auth + RLS
 - Vercel
-- WhatsApp provider adapter (WAHA primeiro; Meta/BSP depois)
+- WhatsApp provider adapter
 - MIRA em modo assistido por padrão
 
 ## Núcleo atual
 
-- Inbox WhatsApp e handoff humano
-- departamentos, filas, SLA e roteamento
+- Inbox, SLA, departamentos e roteamento
 - CRM, contatos, tags, pipelines e deals
-- tarefas e follow-ups sincronizados com o deal
-- origem / UTM com first touch e last touch
-- propostas com link público e aceite
-- recorrência, LTV, VIP, risco e inatividade
-- avaliações pós-venda
-- timeline unificada do cliente
-- notas e campos customizados
-- preferências/consentimento por canal
+- tarefas e follow-ups sincronizados
+- origem / UTM first touch + last touch
+- propostas públicas e aceite
+- recorrência, LTV, VIP, risco e avaliações
+- timeline, notas e campos customizados
+- consentimento/preferências por canal
 - lead scoring configurável
-- base de conhecimento da MIRA com full-text search
-- eventos de domínio e motor de automações
-- outbox de mensagens com retry
+- base de conhecimento full-text para MIRA
+- domain events + motor de automações
+- durable job queue + retry/dead jobs
+- outbox de mensagens
 - webhooks outbound
-- API keys com hash e scopes
+- API keys com hash + scopes
+- empresas/contas B2B
+- catálogo, tabelas de preço e vínculo com proposta
+- histórico de etapa e velocity
+- histórico de atribuição de conversas
+- planos, features, limites e medição de uso
 - auditoria e isolamento multi-tenant
 
-Fluxo:
+Fluxo de negócio:
 
 `Origem → Lead → Atendimento → Tarefa → Proposta → Venda → Recorrência → Avaliação → Reativação`
 
-Por baixo, o backend opera:
+Fluxo técnico:
 
-`Domain Event → Scoring → Automation Rules → Durable Job → Action/Outbox/Webhook`
+`Domain Event → Scoring → Automation Rule → Durable Job → Action / Outbox / Webhook`
 
 ## Rodar
 
@@ -56,32 +59,30 @@ Aplicar em projeto Supabase novo e isolado, na ordem:
 3. `202610050003_commercial_operations.sql`
 4. `202610050004_customer_intelligence.sql`
 5. `202610050005_automation_platform.sql`
+6. `202610050006_saas_business_foundation.sql`
 
 ## Worker
 
-O endpoint interno `/api/internal/jobs/tick` processa automações, mensagens outbound e webhooks.
+`/api/internal/jobs/tick` processa automações, outbox e webhooks.
 
-Proteja com `CRM_WORKER_SECRET`. Pode ser chamado por cron/worker externo depois da infraestrutura estar criada.
+Proteção: `CRM_WORKER_SECRET`.
 
 ## Segurança
 
-- RLS nas tabelas públicas
+- RLS em toda tabela pública
 - views com `security_invoker`
-- helpers internos em schema `private`
+- helpers em schema `private`
 - `SECURITY DEFINER` com `search_path = ''`
 - RPCs privilegiados restritos ao `service_role`
-- nenhum secret de provider no browser
-- API keys armazenadas somente como hash
-- outbound respeita preferência de canal
-- CI valida migrations automaticamente
+- API keys armazenadas só como hash
+- outbox respeita opt-out
+- CI valida migrations
 
 ## CI
 
-`CRM CI` executa:
-
 `typecheck → lint → migration security check → next build`
 
-## Documentação
+## Docs
 
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`

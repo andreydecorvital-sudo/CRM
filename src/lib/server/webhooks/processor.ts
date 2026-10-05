@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto"
 import { isIP } from "node:net"
 import { supabaseRest } from "@/lib/server/supabase/rest"
+import { recordUsage } from "@/lib/server/billing/entitlements"
 
 type DeliveryRow = {
   id: string
@@ -166,6 +167,13 @@ export async function processWebhookDelivery(deliveryId: string) {
       delivered_at: deliveredAt,
       updated_at: deliveredAt,
     })
+
+    await recordUsage({
+      tenantId: delivery.tenant_id,
+      metric: "webhooks.delivered",
+      dedupeKey: `usage:webhook:${delivery.id}`,
+      metadata: { eventId: delivery.event_id, statusCode: response.status },
+    }).catch(() => null)
 
     return { delivered: true, statusCode: response.status }
   } catch (error) {

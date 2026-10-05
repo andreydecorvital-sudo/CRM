@@ -1,5 +1,6 @@
 import { WahaProvider } from "@/lib/server/whatsapp/providers/waha"
 import { supabaseRest } from "@/lib/server/supabase/rest"
+import { recordUsage } from "@/lib/server/billing/entitlements"
 
 type OutboundRow = {
   id: string
@@ -144,6 +145,13 @@ export async function processOutboundMessage(messageId: string) {
         updated_at: sentAt,
       })
     }
+
+    await recordUsage({
+      tenantId: message.tenant_id,
+      metric: "messages.whatsapp.sent",
+      dedupeKey: `usage:outbound:${message.id}`,
+      metadata: { purpose: message.purpose, provider: "waha" },
+    }).catch(() => null)
 
     return { sent: true, provider: "waha", providerMessageId: sent.providerMessageId }
   } catch (error) {

@@ -1,66 +1,59 @@
-# Roadmap de execução
+# Roadmap
 
-## Backend foundation concluída
+## Backend concluído
 - [x] multi-tenant + RLS
-- [x] contatos, mensagens, pipeline e deals
-- [x] WAHA adapter
-- [x] MIRA policy/handoff
-- [x] tarefas e follow-ups
-- [x] departamentos, SLA e roteamento
-- [x] atribuição first/last touch
-- [x] propostas e aceite
-- [x] recorrência / LTV / VIP / risco
+- [x] CRM/deals/pipeline
+- [x] WhatsApp adapter
+- [x] tarefas/follow-up
+- [x] SLA/filas/roteamento
+- [x] UTM first/last touch
+- [x] propostas
+- [x] recorrência/LTV/VIP
 - [x] avaliações
-- [x] customer timeline
-- [x] notas
-- [x] campos customizados tipados
-- [x] preferências por canal
+- [x] timeline/notas
+- [x] custom fields
+- [x] consentimento por canal
 - [x] lead scoring
-- [x] knowledge base FTS
+- [x] knowledge FTS
 - [x] domain events
-- [x] automation rules/runs
+- [x] automation engine
 - [x] durable job queue
-- [x] outbound message outbox
-- [x] webhooks outbound
-- [x] API keys + scopes
-- [x] worker interno
+- [x] outbox
+- [x] webhooks
+- [x] API keys
+- [x] accounts B2B
+- [x] catálogo/price books
+- [x] histórico de estágio/velocity
+- [x] histórico de atribuição
+- [x] subscriptions/features/limits
+- [x] usage metering
 - [x] migration security CI
 
-## Próxima camada de backend
-- [ ] accounts/empresas B2B
-- [ ] histórico de estágio e velocity
-- [ ] catálogo de produtos/serviços
+## Próximo backend
 - [ ] importador CSV assíncrono
-- [ ] horário comercial/feriados
-- [ ] entitlements por plano
-- [ ] WhatsApp session/provider por tenant
-- [ ] API pública versionada
-- [ ] exportação LGPD / exclusão assistida
-- [ ] métricas agregadas e snapshots
+- [ ] business hours/feriados
+- [ ] provider/session WhatsApp por tenant
+- [ ] API pública v1
+- [ ] LGPD export/delete workflow
+- [ ] snapshots de analytics
+- [ ] catálogo de automações/templates por segmento
+- [ ] billing provider
 
-## Infra do piloto
+## Infra piloto
 - [ ] Supabase isolado
 - [ ] Vercel isolada
 - [ ] login/onboarding
 - [ ] primeiro tenant
 - [ ] worker agendado
-- [ ] sessão WhatsApp real
-- [ ] Gemini assist mode
+- [ ] WhatsApp real
+- [ ] Gemini assist
 
 ## Frontend
-Adiado nesta fase. Depois do backend estabilizado:
-- inbox real;
-- builder de automações;
-- editor de pipeline;
-- editor de proposta;
-- configurações de SLA;
-- customer 360;
-- dashboards.
-
-## Comercial
-- [ ] landing CRM
-- [ ] planos e limites
-- [ ] billing
-- [ ] onboarding self-service
-- [ ] templates por segmento
-- [ ] tenant demo isolado
+Adiado até estabilizar backend:
+- customer 360
+- inbox real
+- automation builder
+- proposal editor
+- pipeline editor
+- admin/configurações
+- dashboards

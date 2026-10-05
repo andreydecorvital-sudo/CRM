@@ -1,4 +1,5 @@
 import { supabaseRest } from "@/lib/server/supabase/rest"
+import { recordUsage } from "@/lib/server/billing/entitlements"
 import { evaluateConditions } from "./conditions"
 import { executeAutomationAction } from "./actions"
 import { scoreEvent } from "./scoring"
@@ -156,6 +157,13 @@ export async function processAutomationEvent(eventId: string) {
       processed_at: new Date().toISOString(),
       last_error: null,
     })
+
+    await recordUsage({
+      tenantId: event.tenant_id,
+      metric: "automation.events.processed",
+      dedupeKey: `usage:automation:${event.id}`,
+      metadata: { eventType: event.event_type, rulesMatched, actionsExecuted },
+    }).catch(() => null)
 
     return { scoring, rulesMatched, actionsExecuted, failures }
   } catch (error) {
