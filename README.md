@@ -23,6 +23,8 @@ Backend de CRM + atendimento + automação comercial multiempresa.
 - API pública v1 inicial
 - workflows de privacidade/exportação
 - calendários comerciais e feriados
+- importação CSV assíncrona com retry e progresso
+- SLA contado em horário comercial
 - histórico de etapa, velocity e atribuições
 - subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
@@ -96,4 +98,6 @@ Veja `docs/WHATSAPP.md`.
 - `docs/API.md`
 - `docs/PRIVACY.md`
 - `docs/WHATSAPP.md`
+- `docs/IMPORTS.md`
+- `docs/BUSINESS_HOURS.md`
 - `docs/ROADMAP.md`

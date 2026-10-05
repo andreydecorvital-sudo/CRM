@@ -2,6 +2,7 @@ import { claimJobs, completeJob, failJob, releaseStaleJobs } from "@/lib/server/
 import { processAutomationEvent } from "@/lib/server/automation/engine"
 import { processOutboundMessage } from "@/lib/server/outbound/processor"
 import { processWebhookDelivery } from "@/lib/server/webhooks/processor"
+import { processContactImportChunk } from "@/lib/server/imports/processor"
 import type { JobRow } from "@/lib/server/automation/types"
 
 function payloadId(job: JobRow, key: string) {
@@ -20,6 +21,15 @@ export async function processClaimedJob(job: JobRow) {
       return processWebhookDelivery(payloadId(job, "deliveryId"))
     case "notification":
       return { skipped: true, reason: "notification-jobs-not-used" }
+    case "contact_import": {
+      const importId = payloadId(job, "importId")
+      const firstRow = Number(job.payload?.firstRow)
+      const lastRow = Number(job.payload?.lastRow)
+      if (!Number.isInteger(firstRow) || !Number.isInteger(lastRow) || firstRow < 1 || lastRow < firstRow) {
+        throw new Error(`Job ${job.id} com faixa de importação inválida.`)
+      }
+      return processContactImportChunk({ importId, firstRow, lastRow })
+    }
     case "maintenance":
       return { skipped: true, reason: "maintenance-dispatched-elsewhere" }
     default:
