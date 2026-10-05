@@ -2,10 +2,15 @@
 
 Backend de CRM + atendimento + automação comercial multiempresa.
 
+## Comece por aqui
+
+O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
+
 ## O que já existe no domínio
 
 - contatos, empresas B2B, tags e Customer 360
 - WhatsApp provider-neutral com configuração por tenant
+- lifecycle/status/QR de sessão WhatsApp por tenant
 - conversas, departamentos, filas, SLA e roteamento
 - pipelines, deals, tarefas e follow-up
 - catálogo, tabelas de preço e propostas
@@ -95,6 +100,7 @@ Veja `docs/WHATSAPP.md`.
 
 ## Docs
 
+- `docs/SYSTEM_MAP.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`
 - `docs/BACKEND.md`

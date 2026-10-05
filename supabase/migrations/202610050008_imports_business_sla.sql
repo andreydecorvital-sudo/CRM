@@ -1260,3 +1260,175 @@ grant all on public.email_connections,
   public.contact_registration_sessions,
   public.contact_opportunity_preferences
 to service_role;
+
+
+-- WhatsApp session lifecycle visibility and provisioning state.
+
+alter table public.whatsapp_connections
+  add column if not exists provider_status text,
+  add column if not exists last_status_at timestamptz,
+  add column if not exists last_health_at timestamptz,
+  add column if not exists last_qr_at timestamptz,
+  add column if not exists connected_at timestamptz,
+  add column if not exists disconnected_at timestamptz,
+  add column if not exists last_error text,
+  add column if not exists provider_metadata jsonb not null default '{}'::jsonb;
+
+create index if not exists whatsapp_connections_health_idx
+  on public.whatsapp_connections (tenant_id,status,last_health_at desc);
+
+create table if not exists public.whatsapp_session_events (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  connection_id uuid not null references public.whatsapp_connections(id) on delete cascade,
+  provider text not null,
+  session_name text not null,
+  provider_status text not null,
+  mapped_status text not null
+    check (mapped_status in ('disconnected','pairing','connected','error')),
+  phone_e164 text,
+  error text,
+  metadata jsonb not null default '{}'::jsonb,
+  occurred_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists whatsapp_session_events_recent_idx
+  on public.whatsapp_session_events (tenant_id,connection_id,occurred_at desc);
+
+create or replace function public.crm_record_whatsapp_session_status(
+  p_tenant_id uuid,
+  p_provider text,
+  p_session_name text,
+  p_provider_status text,
+  p_phone_e164 text default null,
+  p_error text default null,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_connection public.whatsapp_connections%rowtype;
+  v_mapped text;
+  v_now timestamptz := now();
+begin
+  if nullif(trim(coalesce(p_session_name,'')),'') is null then
+    raise exception 'session_name obrigatório';
+  end if;
+
+  select * into v_connection
+  from public.whatsapp_connections c
+  where c.tenant_id = p_tenant_id
+    and c.provider = p_provider
+  limit 1
+  for update;
+
+  if v_connection.id is null then
+    raise exception 'conexão WhatsApp não encontrada';
+  end if;
+
+  if nullif(v_connection.config->>'session','') is not null
+     and v_connection.config->>'session' <> p_session_name
+  then
+    raise exception 'evento pertence a outra sessão';
+  end if;
+
+  v_mapped := case upper(trim(coalesce(p_provider_status,'')))
+    when 'WORKING' then 'connected'
+    when 'STARTING' then 'pairing'
+    when 'SCAN_QR_CODE' then 'pairing'
+    when 'PASSKEY_REQUIRED' then 'pairing'
+    when 'PASSKEY_CONFIRMATION_REQUIRED' then 'pairing'
+    when 'STOPPED' then 'disconnected'
+    when 'FAILED' then 'error'
+    else v_connection.status
+  end;
+
+  update public.whatsapp_connections
+  set
+    status = v_mapped,
+    provider_status = upper(trim(coalesce(p_provider_status,''))),
+    phone_e164 = coalesce(nullif(trim(coalesce(p_phone_e164,'')),''),phone_e164),
+    last_status_at = v_now,
+    last_health_at = v_now,
+    last_qr_at = case
+      when upper(trim(coalesce(p_provider_status,''))) = 'SCAN_QR_CODE' then v_now
+      else last_qr_at
+    end,
+    connected_at = case
+      when v_mapped = 'connected' then coalesce(connected_at,v_now)
+      else connected_at
+    end,
+    disconnected_at = case
+      when v_mapped in ('disconnected','error') then v_now
+      else disconnected_at
+    end,
+    last_error = case
+      when v_mapped = 'connected' then null
+      else nullif(trim(coalesce(p_error,'')),'')
+    end,
+    provider_metadata = provider_metadata || coalesce(p_metadata,'{}'::jsonb),
+    updated_at = v_now
+  where id = v_connection.id
+  returning * into v_connection;
+
+  insert into public.whatsapp_session_events (
+    tenant_id,
+    connection_id,
+    provider,
+    session_name,
+    provider_status,
+    mapped_status,
+    phone_e164,
+    error,
+    metadata,
+    occurred_at
+  )
+  values (
+    p_tenant_id,
+    v_connection.id,
+    p_provider,
+    p_session_name,
+    coalesce(nullif(trim(coalesce(p_provider_status,'')),''),'UNKNOWN'),
+    v_mapped,
+    nullif(trim(coalesce(p_phone_e164,'')),''),
+    nullif(trim(coalesce(p_error,'')),''),
+    coalesce(p_metadata,'{}'::jsonb),
+    v_now
+  );
+
+  return jsonb_build_object(
+    'connectionId',v_connection.id,
+    'tenantId',v_connection.tenant_id,
+    'provider',v_connection.provider,
+    'status',v_connection.status,
+    'providerStatus',v_connection.provider_status,
+    'phoneE164',v_connection.phone_e164,
+    'lastStatusAt',v_connection.last_status_at,
+    'connectedAt',v_connection.connected_at,
+    'lastError',v_connection.last_error
+  );
+end;
+$$;
+
+revoke all on function public.crm_record_whatsapp_session_status(
+  uuid,text,text,text,text,text,jsonb
+) from public, anon, authenticated;
+
+grant execute on function public.crm_record_whatsapp_session_status(
+  uuid,text,text,text,text,text,jsonb
+) to service_role;
+
+alter table public.whatsapp_session_events enable row level security;
+
+create policy "members whatsapp_session_events read"
+on public.whatsapp_session_events
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+revoke all on public.whatsapp_session_events from anon;
+grant select on public.whatsapp_session_events to authenticated;
+grant all on public.whatsapp_session_events to service_role;

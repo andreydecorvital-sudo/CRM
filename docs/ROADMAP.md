@@ -40,7 +40,7 @@
 ## Próximo backend
 - [x] importador CSV assíncrono
 - [x] cálculo de SLA em horário comercial
-- [ ] provisioning/status/QR de sessão WhatsApp por tenant
+- [x] backend provisioning/status/QR de sessão WhatsApp por tenant
 - [ ] API v1 de deals/tasks/propostas
 - [ ] anonimização/exclusão LGPD assistida
 - [ ] snapshots de analytics
