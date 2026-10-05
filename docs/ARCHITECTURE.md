@@ -1,52 +1,47 @@
-# MIRA CRM — arquitetura inicial
+# MIRA CRM — arquitetura
 
 ## Princípios
 
 - SaaS multiempresa desde o banco.
 - WhatsApp é provider-neutral; WAHA é só o primeiro adapter.
-- MIRA nunca é dona do dado: conversa, lead, compra, avaliação e auditoria vivem no domínio CRM.
-- IA inicia em `assist`; `auto` só é habilitado por tenant e por política.
+- MIRA nunca é dona do dado: conversa, lead, tarefa, proposta, compra e avaliação vivem no domínio CRM.
+- IA inicia em `assist`; `auto` só é habilitado por tenant e política.
 - Toda mensagem recebida é idempotente por conversa + external_id.
-- Nenhum segredo de provider entra em tabela em texto puro; `secret_ref` aponta para secret manager/env.
-- Recorrência e reputação fazem parte do mesmo ciclo do cliente, sem virar bancos paralelos.
+- Segredos de provider ficam fora das tabelas em texto puro.
+- Decisões concorrentes importantes são atômicas no Postgres.
 
 ## Fluxo
 
-WhatsApp provider → webhook normalizado → ingestão idempotente → contato/conversa → classificação MIRA → CRM → venda → transação → recorrência → pós-venda → avaliação → reativação.
+WhatsApp provider → webhook → contato/conversa → departamento/SLA → roteamento → MIRA/humano → deal → follow-up → proposta → venda → recorrência → avaliação → reativação.
 
-## 253 · Recorrência
+## Concorrência e atomicidade
 
-A compra é registrada em `customer_transactions`. Um trigger recalcula `customer_profiles` com:
+### Roteamento
+`crm_route_conversation` bloqueia a conversa antes de escolher atendente. Evita dois workers distribuírem a mesma conversa simultaneamente.
 
-- número de compras;
-- LTV;
-- ticket médio;
-- primeira e última compra;
-- tier: lead / primeira compra / recorrente / VIP.
+### Proposta
+`crm_create_proposal` cria cabeçalho e itens na mesma transação. `crm_accept_proposal` bloqueia a proposta antes do aceite e é idempotente.
 
-O status de atividade é calculado separadamente na view `customer_lifecycle`: ativo / em risco / inativo. Assim um VIP pode estar em risco sem perder a informação de valor.
+### Follow-up
+`deals.next_followup_at` sincroniza uma única tarefa automática por deal através de `automation_key`.
 
-## 257 · Avaliações
+## Atribuição
 
-`review_requests` controla fila, envio e resposta. Cada pedido recebe `public_token` aleatório e a rota pública só permite registrar nota/feedback daquele token. A automação respeita delay e cooldown configuráveis por tenant.
+`lead_attributions` preserva todos os touches. A view `contact_attribution` fornece first touch e last touch sem destruir o histórico intermediário.
 
-Não existe review gating: uma eventual URL pública de Google/marketplace é disponibilizada sem condicionar à nota informada.
+## SLA
+
+Departamento define metas de primeira resposta/resolução. A conversa armazena deadlines calculados e a primeira mensagem outbound captura `first_response_at`.
 
 ## Segurança
 
-- RLS em tabelas expostas.
-- helper de membership em schema `private`.
-- `SECURITY DEFINER` usa `search_path = ''` e nomes totalmente qualificados.
-- RPC de ingestão do provider é executável apenas pelo `service_role`.
-- views públicas usam `security_invoker = true`.
-- grants do Data API são explícitos.
+- RLS em tabelas do schema público.
+- membership helper no schema `private`.
+- RPCs privilegiados executáveis apenas pelo `service_role`.
+- `SECURITY DEFINER` com `search_path = ''`.
+- views com `security_invoker = true`.
+- proposta e avaliação públicas usam token e endpoints server-side.
 
-## Fases seguintes
+## Infra pendente
 
-1. Supabase e Vercel isolados.
-2. Auth + convites.
-3. Inbox/CRM com dados reais.
-4. Sessão WhatsApp por tenant.
-5. worker de mensagens/agendamentos.
-6. MIRA/Gemini em modo assistido.
-7. automação segura por política.
+O código está pronto para Supabase/Vercel isolados, mas migrations não devem ser aplicadas em projetos de outros produtos.

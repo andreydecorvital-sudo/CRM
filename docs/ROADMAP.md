@@ -1,41 +1,56 @@
 # Roadmap de execução
 
-## Sprint 0 — base
-- [x] repo/base independente
-- [x] multi-tenant no banco
-- [x] contatos, inbox, mensagens e auditoria
-- [x] pipeline/deals/tags
+## Base concluída
+- [x] repo independente
+- [x] multi-tenant + RLS
+- [x] contatos, mensagens, inbox e auditoria
+- [x] pipeline, deals e tags
 - [x] adapter WAHA
 - [x] política de handoff da MIRA
-- [x] 253 · clientes recorrentes / LTV / VIP / risco
-- [x] 257 · coleta de avaliações / link público / cooldown
+- [x] 253 · recorrência / LTV / VIP / risco
+- [x] 257 · avaliações / link público / cooldown
+- [x] tarefas e follow-ups
+- [x] sincronização automática de follow-up do deal
+- [x] departamentos, SLA e roteamento
+- [x] first touch / last touch / UTM
+- [x] propostas com itens, totais, link público e aceite
+- [x] RPCs atômicos para roteamento e aceite
 - [x] hardening de RLS e SECURITY DEFINER
 - [x] CI de typecheck + build
-- [ ] criar Supabase isolado
-- [ ] conectar Vercel
-- [ ] primeiro tenant real
 
-## Sprint 1 — piloto vendável
-- [ ] login e convite de equipe
+## Piloto vendável
+- [ ] Supabase isolado do CRM
+- [ ] Vercel do CRM
+- [ ] login, onboarding e convite de equipe
+- [ ] primeiro tenant real
 - [ ] inbox lendo dados reais
 - [ ] envio real pelo WhatsApp
 - [ ] QR/session por tenant
+- [ ] configuração visual de departamentos e SLA
+- [ ] cadastro real de pipeline
+- [ ] editor real de proposta
+- [ ] importação de contatos
 - [ ] MIRA gerar rascunho com Gemini
-- [ ] filtros reais no CRM
-- [ ] mover lead entre etapas
-- [ ] notas e follow-up
-- [ ] tela de configuração das regras de recorrência
-- [ ] worker que envia avaliações pendentes
+- [ ] métricas reais no dashboard
 
-## Sprint 2 — automação
-- [ ] resposta automática por regras
-- [ ] horário comercial
-- [ ] SLA e fila
-- [ ] playbooks por segmento
-- [ ] webhooks de entrega/leitura
-- [ ] métricas de atendimento e vendas
-- [ ] campanhas de reativação de clientes em risco/inativos
-- [ ] métricas de NPS/CSAT e temas recorrentes de feedback
+## Automação
+- [ ] classificador de intenção → departamento
+- [ ] resposta automática por política
+- [ ] horário comercial e feriados
+- [ ] worker de tarefas vencidas
+- [ ] worker de avaliações pendentes
+- [ ] campanhas de reativação
+- [ ] captura web de UTM/lead
+- [ ] webhooks de entrega/leitura do WhatsApp
+- [ ] alertas de SLA
 
-## Produto 2 — Afiliados
-Manter como módulo/produto separado. Reutilizar autenticação, tenants, filas, auditoria e scheduler; criar domínio próprio para ofertas, links, canais, campanhas, cliques, vendas e comissão.
+## Comercial
+- [ ] landing específica do CRM
+- [ ] planos e limites
+- [ ] billing
+- [ ] onboarding self-service
+- [ ] templates por segmento
+- [ ] demonstração com tenant fake isolado
+
+## Afiliados
+Produto/módulo separado. Pode reutilizar autenticação, tenants, filas, auditoria e scheduler, mas mantém domínio próprio.

@@ -1,6 +1,6 @@
 # MIRA CRM
 
-Atendimento automático + CRM multiempresa, extraído da arquitetura MIRA/WhatsApp do Argoplace sem carregar o monolito de marketplace.
+CRM + atendimento + automação comercial multiempresa.
 
 ## Stack
 
@@ -10,15 +10,21 @@ Atendimento automático + CRM multiempresa, extraído da arquitetura MIRA/WhatsA
 - WhatsApp provider adapter (WAHA primeiro; Meta/BSP depois)
 - MIRA em modo assistido por padrão
 
-## Módulos atuais
+## Produto atual
 
-- Inbox de atendimento
-- contatos, tags e pipeline
-- leads/deals e handoff humano
-- webhook WhatsApp idempotente
-- auditoria multi-tenant
-- **253 · Recorrência:** compras, LTV, ticket médio, 1ª compra, recorrente, VIP, em risco e inativo
-- **257 · Avaliações:** fila pós-venda, cooldown, link público, nota, feedback e auditoria
+- Inbox WhatsApp e handoff humano
+- departamentos, filas, SLA e roteamento
+- CRM, contatos, tags, pipelines e deals
+- tarefas e follow-ups com sincronização automática do deal
+- origem / UTM com first touch e last touch
+- propostas com itens, desconto, link público, visualização e aceite
+- recorrência, LTV, ticket, VIP, risco e inatividade
+- avaliações pós-venda com cooldown
+- auditoria e isolamento multi-tenant
+
+O fluxo de produto é:
+
+`Origem → Lead → Atendimento → Tarefa → Proposta → Venda → Recorrência → Avaliação → Reativação`
 
 ## Rodar
 
@@ -28,21 +34,28 @@ npm install
 npm run dev
 ```
 
-Para um projeto Supabase novo e isolado, aplique na ordem:
+Para um projeto Supabase novo e isolado, aplique as migrations na ordem:
 
-1. `supabase/migrations/202610050001_init_mira_crm.sql`
-2. `supabase/migrations/202610050002_customer_lifecycle_reviews.sql`
+1. `202610050001_init_mira_crm.sql`
+2. `202610050002_customer_lifecycle_reviews.sql`
+3. `202610050003_commercial_operations.sql`
 
 ## Segurança
 
-Não copie secrets do VitalHub. Use um Supabase próprio, novas chaves e novas variáveis de ambiente. O webhook exige `x-mira-webhook-secret`.
+Não copie secrets do VitalHub. Use um Supabase próprio e novas credenciais.
 
-A v0.2 move o helper de membership para o schema privado, restringe o RPC de ingestão ao `service_role`, usa RLS e grants explícitos e cria views com `security_invoker`.
+- RLS nas tabelas expostas;
+- helper de membership em schema privado;
+- RPCs privilegiados restritos ao `service_role`;
+- `SECURITY DEFINER` com `search_path = ''`;
+- views com `security_invoker`;
+- links públicos usam tokens aleatórios e passam pelo servidor;
+- nenhum provider secret vai para o browser.
 
-## Avaliações
+## CI
 
-O coletor não faz review gating: a URL pública de avaliação pode ser oferecida a qualquer cliente que conclua o formulário, independentemente da nota interna. A automação nasce desligada por tenant e só agenda mensagens quando `review_enabled` e `review_auto_send_enabled` estiverem ativos.
+O workflow `CRM CI` executa instalação, TypeScript e `next build` em push/PR.
 
-## Origem técnica
+## Produto
 
-O núcleo foi redesenhado a partir das ideias já testadas no VitalHub: contatos, conversas, mensagens, ingestão idempotente, handoff e adapter de WhatsApp. Nomes, tabelas e limites foram alterados para um SaaS multiempresa independente.
+Veja `docs/PRODUCT.md` e `docs/ARCHITECTURE.md`.
