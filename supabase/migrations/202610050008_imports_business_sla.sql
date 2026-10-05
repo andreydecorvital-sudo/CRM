@@ -13,7 +13,8 @@ alter table public.job_queue
     'maintenance',
     'contact_import',
     'event_router',
-    'action_execution'
+    'action_execution',
+    'commercial_intelligence'
   ));
 
 create or replace function private.enqueue_job(
@@ -41,7 +42,8 @@ begin
     'maintenance',
     'contact_import',
     'event_router',
-    'action_execution'
+    'action_execution',
+    'commercial_intelligence'
   ) then
     raise exception 'tipo de job inválido';
   end if;
@@ -2109,3 +2111,568 @@ grant all on public.event_router_dispatches,
   public.authorized_intents,
   public.action_execution_receipts
 to service_role;
+
+
+-- Commercial Intelligence: explainable Deal Health, Revenue Recovery and Next Action.
+
+create table if not exists public.deal_health_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  score integer not null check (score between 0 and 100),
+  band text not null
+    check (band in ('healthy','attention','at_risk','critical')),
+  pipeline_value_cents bigint not null default 0 check (pipeline_value_cents >= 0),
+  exposed_value_cents bigint not null default 0 check (exposed_value_cents >= 0),
+  health_fingerprint text not null,
+  reasons jsonb not null default '[]'::jsonb,
+  signals jsonb not null default '{}'::jsonb,
+  algorithm_version text not null default 'deal-health-v1',
+  calculated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (tenant_id,deal_id,health_fingerprint)
+);
+
+create index if not exists deal_health_snapshots_latest_idx
+  on public.deal_health_snapshots (tenant_id,deal_id,calculated_at desc);
+
+create table if not exists public.next_action_recommendations (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  contact_id uuid not null references public.contacts(id) on delete cascade,
+  health_snapshot_id uuid references public.deal_health_snapshots(id) on delete set null,
+  action_key text not null,
+  action_type text not null,
+  title text not null,
+  reason text not null,
+  due_at timestamptz,
+  confidence numeric(5,4) not null check (confidence between 0 and 1),
+  risk_level text not null
+    check (risk_level in ('low','medium','high','critical')),
+  priority text not null
+    check (priority in ('low','normal','high','urgent')),
+  payload jsonb not null default '{}'::jsonb,
+  evidence jsonb not null default '[]'::jsonb,
+  status text not null default 'active'
+    check (status in ('active','proposed','authorized','executed','dismissed','stale')),
+  action_proposal_id uuid references public.action_proposals(id) on delete set null,
+  proposed_at timestamptz,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id,action_key)
+);
+
+create index if not exists next_action_recommendations_queue_idx
+  on public.next_action_recommendations (tenant_id,status,priority,due_at,created_at desc);
+
+create table if not exists public.revenue_recovery_cases (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  deal_id uuid not null references public.deals(id) on delete cascade,
+  contact_id uuid not null references public.contacts(id) on delete cascade,
+  health_snapshot_id uuid references public.deal_health_snapshots(id) on delete set null,
+  next_action_id uuid references public.next_action_recommendations(id) on delete set null,
+  recovery_key text not null,
+  reason_code text not null,
+  severity text not null check (severity in ('attention','at_risk','critical')),
+  pipeline_value_cents bigint not null default 0 check (pipeline_value_cents >= 0),
+  exposed_value_cents bigint not null default 0 check (exposed_value_cents >= 0),
+  days_stalled integer not null default 0 check (days_stalled >= 0),
+  summary text not null,
+  evidence jsonb not null default '[]'::jsonb,
+  status text not null default 'open'
+    check (status in ('open','proposed','authorized','recovered','dismissed','stale')),
+  detected_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id,recovery_key)
+);
+
+create index if not exists revenue_recovery_cases_queue_idx
+  on public.revenue_recovery_cases (
+    tenant_id,status,severity,exposed_value_cents desc,detected_at desc
+  );
+
+create or replace function private.validate_deal_intelligence_row()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists(
+    select 1 from public.deals d
+    where d.id = new.deal_id and d.tenant_id = new.tenant_id
+  ) then
+    raise exception 'deal de inteligência fora do tenant';
+  end if;
+
+  if nullif(to_jsonb(new)->>'contact_id','') is not null and not exists(
+    select 1 from public.contacts c
+    where c.id = (to_jsonb(new)->>'contact_id')::uuid
+      and c.tenant_id = new.tenant_id
+  ) then
+    raise exception 'contato de inteligência fora do tenant';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.validate_deal_intelligence_row()
+from public, anon, authenticated;
+
+drop trigger if exists deal_health_snapshots_validate on public.deal_health_snapshots;
+create trigger deal_health_snapshots_validate
+before insert or update of tenant_id,deal_id
+on public.deal_health_snapshots
+for each row execute function private.validate_deal_intelligence_row();
+
+drop trigger if exists next_action_recommendations_validate on public.next_action_recommendations;
+create trigger next_action_recommendations_validate
+before insert or update of tenant_id,deal_id,contact_id
+on public.next_action_recommendations
+for each row execute function private.validate_deal_intelligence_row();
+
+drop trigger if exists revenue_recovery_cases_validate on public.revenue_recovery_cases;
+create trigger revenue_recovery_cases_validate
+before insert or update of tenant_id,deal_id,contact_id
+on public.revenue_recovery_cases
+for each row execute function private.validate_deal_intelligence_row();
+
+create or replace view public.deal_health_current
+with (security_invoker = true)
+as
+select distinct on (s.tenant_id,s.deal_id)
+  s.*
+from public.deal_health_snapshots s
+join public.deals d
+  on d.id = s.deal_id
+ and d.tenant_id = s.tenant_id
+where d.won_at is null
+  and d.lost_at is null
+order by s.tenant_id,s.deal_id,s.calculated_at desc,s.created_at desc;
+
+create or replace view public.revenue_recovery_summary
+with (security_invoker = true)
+as
+select
+  r.tenant_id,
+  count(*) filter (where r.status in ('open','proposed','authorized'))::integer as active_cases,
+  count(*) filter (
+    where r.status in ('open','proposed','authorized')
+      and r.severity = 'critical'
+  )::integer as critical_cases,
+  count(*) filter (
+    where r.status in ('open','proposed','authorized')
+      and r.severity = 'at_risk'
+  )::integer as at_risk_cases,
+  coalesce(sum(r.pipeline_value_cents) filter (
+    where r.status in ('open','proposed','authorized')
+  ),0)::bigint as pipeline_value_cents,
+  coalesce(sum(r.exposed_value_cents) filter (
+    where r.status in ('open','proposed','authorized')
+  ),0)::bigint as exposed_value_cents,
+  max(r.detected_at) filter (
+    where r.status in ('open','proposed','authorized')
+  ) as latest_detection_at
+from public.revenue_recovery_cases r
+group by r.tenant_id;
+
+alter table public.deal_health_snapshots enable row level security;
+alter table public.next_action_recommendations enable row level security;
+alter table public.revenue_recovery_cases enable row level security;
+
+create policy "members deal_health_snapshots read"
+on public.deal_health_snapshots
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+create policy "members next_action_recommendations read"
+on public.next_action_recommendations
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+create policy "members revenue_recovery_cases read"
+on public.revenue_recovery_cases
+for select to authenticated
+using ((select private.is_tenant_member(tenant_id)));
+
+revoke all on public.deal_health_snapshots,
+  public.next_action_recommendations,
+  public.revenue_recovery_cases
+from anon;
+
+grant select on public.deal_health_snapshots,
+  public.next_action_recommendations,
+  public.revenue_recovery_cases,
+  public.deal_health_current,
+  public.revenue_recovery_summary
+to authenticated;
+
+grant all on public.deal_health_snapshots,
+  public.next_action_recommendations,
+  public.revenue_recovery_cases
+to service_role;
+
+grant select on public.deal_health_current,
+  public.revenue_recovery_summary
+to service_role;
+
+
+create unique index if not exists next_action_one_current_per_deal_idx
+  on public.next_action_recommendations (tenant_id,deal_id)
+  where status in ('active','proposed','authorized');
+
+create unique index if not exists revenue_recovery_one_active_per_deal_idx
+  on public.revenue_recovery_cases (tenant_id,deal_id)
+  where status in ('open','proposed','authorized');
+
+create or replace function private.sync_next_action_proposal_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now timestamptz := now();
+begin
+  if old.status is not distinct from new.status then
+    return new;
+  end if;
+
+  if new.status = 'authorized' then
+    update public.next_action_recommendations
+    set status = 'authorized',
+        updated_at = v_now
+    where action_proposal_id = new.id
+      and status in ('active','proposed');
+
+    update public.revenue_recovery_cases r
+    set status = 'authorized',
+        updated_at = v_now
+    where r.next_action_id in (
+      select n.id
+      from public.next_action_recommendations n
+      where n.action_proposal_id = new.id
+    )
+      and r.status in ('open','proposed');
+  elsif new.status = 'rejected' then
+    update public.next_action_recommendations
+    set status = 'dismissed',
+        resolved_at = v_now,
+        updated_at = v_now
+    where action_proposal_id = new.id
+      and status in ('active','proposed');
+
+    update public.revenue_recovery_cases r
+    set status = 'open',
+        updated_at = v_now
+    where r.next_action_id in (
+      select n.id
+      from public.next_action_recommendations n
+      where n.action_proposal_id = new.id
+    )
+      and r.status in ('proposed','authorized');
+  elsif new.status = 'expired' then
+    update public.next_action_recommendations
+    set status = 'stale',
+        resolved_at = v_now,
+        updated_at = v_now
+    where action_proposal_id = new.id
+      and status in ('active','proposed');
+
+    update public.revenue_recovery_cases r
+    set status = 'open',
+        updated_at = v_now
+    where r.next_action_id in (
+      select n.id
+      from public.next_action_recommendations n
+      where n.action_proposal_id = new.id
+    )
+      and r.status = 'proposed';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.sync_next_action_proposal_status()
+from public, anon, authenticated;
+
+drop trigger if exists action_proposals_sync_next_action
+on public.action_proposals;
+
+create trigger action_proposals_sync_next_action
+after update of status on public.action_proposals
+for each row execute function private.sync_next_action_proposal_status();
+
+create or replace function private.sync_next_action_execution_receipt()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_proposal_id uuid;
+  v_now timestamptz := now();
+begin
+  if old.status is not distinct from new.status then
+    return new;
+  end if;
+
+  if new.status not in ('verified','blocked','adapter_missing') then
+    return new;
+  end if;
+
+  select i.proposal_id into v_proposal_id
+  from public.authorized_intents i
+  where i.id = new.intent_id;
+
+  if v_proposal_id is null then
+    return new;
+  end if;
+
+  if new.status = 'verified' then
+    update public.next_action_recommendations
+    set status = 'executed',
+        resolved_at = v_now,
+        updated_at = v_now
+    where action_proposal_id = v_proposal_id
+      and status = 'authorized';
+  else
+    update public.next_action_recommendations
+    set status = 'stale',
+        resolved_at = v_now,
+        updated_at = v_now
+    where action_proposal_id = v_proposal_id
+      and status = 'authorized';
+  end if;
+
+  update public.revenue_recovery_cases r
+  set status = 'open',
+      updated_at = v_now
+  where r.next_action_id in (
+    select n.id
+    from public.next_action_recommendations n
+    where n.action_proposal_id = v_proposal_id
+  )
+    and r.status = 'authorized';
+
+  return new;
+end;
+$;
+
+revoke execute on function private.sync_next_action_execution_receipt()
+from public, anon, authenticated;
+
+drop trigger if exists action_execution_receipts_sync_next_action
+on public.action_execution_receipts;
+
+create trigger action_execution_receipts_sync_next_action
+after update of status on public.action_execution_receipts
+for each row execute function private.sync_next_action_execution_receipt();
+
+create or replace function private.tasks_emit_domain_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_event_type text;
+begin
+  if tg_op = 'INSERT' then
+    v_event_type := 'task.created';
+  elsif old.status is distinct from new.status then
+    v_event_type := 'task.' || new.status;
+  else
+    v_event_type := 'task.updated';
+  end if;
+
+  perform private.emit_domain_event_internal(
+    new.tenant_id,
+    v_event_type,
+    'task',
+    new.id,
+    new.contact_id,
+    jsonb_build_object(
+      'dealId',new.deal_id,
+      'conversationId',new.conversation_id,
+      'assignedTo',new.assigned_to,
+      'status',new.status,
+      'priority',new.priority,
+      'kind',new.kind,
+      'dueAt',new.due_at
+    ),
+    'task-event:' || new.id::text || ':' || v_event_type || ':' || extract(epoch from new.updated_at)::bigint::text,
+    new.updated_at
+  );
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.tasks_emit_domain_event()
+from public, anon, authenticated;
+
+drop trigger if exists tasks_emit_domain_event on public.tasks;
+create trigger tasks_emit_domain_event
+after insert or update of status,due_at,assigned_to,priority
+on public.tasks
+for each row execute function private.tasks_emit_domain_event();
+
+create or replace function private.domain_event_commercial_intelligence_after_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_payload jsonb;
+  v_deal_id uuid;
+begin
+  if new.event_type like 'deal.health.%'
+     or new.event_type like 'revenue.recovery.%'
+     or new.event_type like 'next_action.%'
+  then
+    return new;
+  end if;
+
+  if new.event_type like 'deal.%' and new.aggregate_type = 'deal' then
+    v_deal_id := new.aggregate_id;
+    v_payload := jsonb_build_object(
+      'tenantId',new.tenant_id,
+      'dealId',v_deal_id,
+      'limit',1
+    );
+  elsif new.event_type like 'proposal.%'
+        and nullif(new.payload->>'dealId','') is not null
+  then
+    begin
+      v_deal_id := (new.payload->>'dealId')::uuid;
+    exception when others then
+      return new;
+    end;
+
+    v_payload := jsonb_build_object(
+      'tenantId',new.tenant_id,
+      'dealId',v_deal_id,
+      'limit',1
+    );
+  elsif new.event_type like 'task.%'
+        and nullif(new.payload->>'dealId','') is not null
+  then
+    begin
+      v_deal_id := (new.payload->>'dealId')::uuid;
+    exception when others then
+      return new;
+    end;
+
+    v_payload := jsonb_build_object(
+      'tenantId',new.tenant_id,
+      'dealId',v_deal_id,
+      'limit',1
+    );
+  elsif new.event_type in ('message.received','message.sent')
+        and new.contact_id is not null
+  then
+    v_payload := jsonb_build_object(
+      'tenantId',new.tenant_id,
+      'contactId',new.contact_id,
+      'limit',50
+    );
+  else
+    return new;
+  end if;
+
+  perform private.enqueue_job(
+    new.tenant_id,
+    'commercial_intelligence',
+    v_payload,
+    'commercial-intelligence:event:' || new.id::text,
+    now() + interval '3 seconds',
+    110,
+    5
+  );
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.domain_event_commercial_intelligence_after_insert()
+from public, anon, authenticated;
+
+drop trigger if exists domain_events_commercial_intelligence on public.domain_events;
+create trigger domain_events_commercial_intelligence
+after insert on public.domain_events
+for each row execute function private.domain_event_commercial_intelligence_after_insert();
+
+create or replace function private.close_deal_commercial_intelligence()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now timestamptz := coalesce(new.won_at,new.lost_at,new.updated_at,now());
+  v_recovery_status text;
+begin
+  if new.won_at is null and new.lost_at is null then
+    return new;
+  end if;
+
+  v_recovery_status := case
+    when new.won_at is not null then 'recovered'
+    else 'stale'
+  end;
+
+  update public.action_proposals p
+  set status = 'expired',
+      updated_at = v_now
+  where p.id in (
+    select n.action_proposal_id
+    from public.next_action_recommendations n
+    where n.tenant_id = new.tenant_id
+      and n.deal_id = new.id
+      and n.action_proposal_id is not null
+      and n.status in ('active','proposed')
+  )
+    and p.status in ('proposed','awaiting_approval');
+
+  update public.next_action_recommendations
+  set status = 'stale',
+      resolved_at = v_now,
+      updated_at = v_now
+  where tenant_id = new.tenant_id
+    and deal_id = new.id
+    and status in ('active','proposed');
+
+  update public.revenue_recovery_cases
+  set status = v_recovery_status,
+      resolved_at = v_now,
+      updated_at = v_now
+  where tenant_id = new.tenant_id
+    and deal_id = new.id
+    and status in ('open','proposed','authorized');
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.close_deal_commercial_intelligence()
+from public, anon, authenticated;
+
+drop trigger if exists deals_close_commercial_intelligence on public.deals;
+create trigger deals_close_commercial_intelligence
+after update of won_at,lost_at on public.deals
+for each row
+when (
+  (old.won_at is null and new.won_at is not null)
+  or (old.lost_at is null and new.lost_at is not null)
+)
+execute function private.close_deal_commercial_intelligence();

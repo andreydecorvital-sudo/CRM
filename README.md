@@ -39,6 +39,9 @@ O mapa canônico do produto e do código está em `docs/SYSTEM_MAP.md`.
 - disparo de e-mail por tenant via outbox
 - consentimento específico para oportunidades por canal
 - histórico de etapa, velocity e atribuições
+- Deal Health Score explicável
+- Revenue Recovery / pipeline exposto
+- Next Action Recommendations governadas pelo Router
 - subscriptions/features/limits e usage metering
 - auditoria e isolamento multi-tenant
 
@@ -113,6 +116,7 @@ Veja `docs/WHATSAPP.md`.
 - `docs/TECH_RADAR.md`
 - `docs/PLATFORM_STACK.md`
 - `docs/AI_GATEWAY.md`
+- `docs/COMMERCIAL_INTELLIGENCE.md`
 - `docs/ROUTER.md`
 - `docs/PRODUCT.md`
 - `docs/ARCHITECTURE.md`

@@ -47,7 +47,7 @@ export type AutomationRule = {
 export type JobRow = {
   id: string
   tenant_id: string
-  kind: "automation" | "outbound_message" | "webhook" | "notification" | "maintenance" | "contact_import" | "event_router" | "action_execution"
+  kind: "automation" | "outbound_message" | "webhook" | "notification" | "maintenance" | "contact_import" | "event_router" | "action_execution" | "commercial_intelligence"
   status: "queued" | "running" | "succeeded" | "failed" | "dead" | "cancelled"
   attempts: number
   max_attempts: number

@@ -5,6 +5,7 @@ import { processWebhookDelivery } from "@/lib/server/webhooks/processor"
 import { processContactImportChunk } from "@/lib/server/imports/processor"
 import { routeDomainEvent } from "@/lib/server/router/event-router"
 import { executeAuthorizedIntent } from "@/lib/server/router/execution"
+import { scanCommercialIntelligence } from "@/lib/server/intelligence/scanner"
 import type { JobRow } from "@/lib/server/automation/types"
 
 function payloadId(job: JobRow, key: string) {
@@ -32,6 +33,15 @@ export async function processClaimedJob(job: JobRow) {
         workerId,
       })
     }
+    case "commercial_intelligence":
+      return scanCommercialIntelligence({
+        tenantId: job.tenant_id,
+        dealId: typeof job.payload?.dealId === "string" ? job.payload.dealId : null,
+        contactId: typeof job.payload?.contactId === "string" ? job.payload.contactId : null,
+        limit: Number.isFinite(Number(job.payload?.limit))
+          ? Math.min(Math.max(Math.trunc(Number(job.payload?.limit)),1),1000)
+          : 250,
+      })
     case "notification":
       return { skipped: true, reason: "notification-jobs-not-used" }
     case "contact_import": {

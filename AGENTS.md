@@ -4,10 +4,11 @@ Antes de alterar o projeto, leia:
 
 1. `docs/SYSTEM_MAP.md`
 2. `docs/ROUTER.md`
-3. `docs/TECH_RADAR.md`
-4. `docs/PLATFORM_STACK.md`
-5. `docs/ARCHITECTURE.md`
-6. o documento específico do domínio afetado.
+3. `docs/COMMERCIAL_INTELLIGENCE.md`
+4. `docs/TECH_RADAR.md`
+5. `docs/PLATFORM_STACK.md`
+6. `docs/ARCHITECTURE.md`
+7. o documento específico do domínio afetado.
 
 ## Regras obrigatórias
 
@@ -31,6 +32,9 @@ Antes de alterar o projeto, leia:
 - Analytics não recebe prompt, mensagem, e-mail, telefone ou secrets.
 - Prompt/resposta em observabilidade é opt-in; padrão é metadata-only.
 - Tecnologia nova precisa passar pelo `docs/TECH_RADAR.md`.
+- Deal Health deve permanecer explicável; não esconder score atrás de IA.
+- “Receita em risco” não pode ser apresentada como “receita recuperável” sem modelo histórico validado.
+- Next Action nunca faz write direto; usa Action Proposal.
 - Mudança estrutural exige atualização do `docs/SYSTEM_MAP.md`.
 
 ## Gates

@@ -41,6 +41,10 @@
 - [x] LiteLLM-compatible client
 - [x] PostHog server analytics foundation
 - [x] OpenTelemetry + Langfuse tracing foundation
+- [x] Deal Health Score v1 explicável
+- [x] Revenue Recovery Engine v1
+- [x] Next Action Engine v1
+- [x] Commercial Intelligence reativo via Domain Events
 - [x] cadastro guiado de cliente pelo WhatsApp
 - [x] e-mail outbound por tenant
 - [x] consentimento específico de oportunidades
@@ -62,7 +66,8 @@
 - [x] backend provisioning/status/QR de sessão WhatsApp por tenant
 - [ ] API v1 de deals/tasks/propostas
 - [ ] anonimização/exclusão LGPD assistida
-- [ ] snapshots de analytics
+- [x] snapshots de Deal Health
+- [ ] snapshots agregados de analytics
 - [ ] templates de automações por segmento
 - [ ] billing provider
 

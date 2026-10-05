@@ -53,6 +53,22 @@ export function policyForDomainEvent(event: RouterDomainEvent): RouterPolicy {
     return policy("customer.contact",["customer","acquisition"],"info","route")
   }
 
+  if (/^deal\.health\./.test(eventType)) {
+    return policy("sales.deal.health",["sales","tasks","analytics"],"info","observe")
+  }
+
+  if (/^next\.action\./.test(eventType) || /^next_action\./.test(eventType)) {
+    return policy("sales.next.action",["tasks","sales","analytics"],"info","observe")
+  }
+
+  if (/^revenue\.recovery\./.test(eventType)) {
+    return policy("sales.revenue.recovery",["sales","tasks","analytics"],"warning","propose")
+  }
+
+  if (/^task\./.test(eventType)) {
+    return policy("sales.task",["tasks","sales","analytics"],"info","observe")
+  }
+
   if (/^deal\.created$/.test(eventType)) {
     return policy("sales.deal.created",["sales","tasks","analytics"],"info","propose")
   }

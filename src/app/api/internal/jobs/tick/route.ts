@@ -31,7 +31,7 @@ async function handle(request: Request) {
   const result = await runWorkerTick({
     workerId,
     limit,
-    kinds: ["event_router","automation","action_execution","outbound_message","webhook","contact_import"],
+    kinds: ["event_router","automation","commercial_intelligence","action_execution","outbound_message","webhook","contact_import"],
   })
 
   return Response.json({ ok: true, workerId, ...result })

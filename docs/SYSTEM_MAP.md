@@ -47,6 +47,11 @@ flowchart LR
   ANALYTICS[Analytics] --> E
   ANALYTICS --> I
   ANALYTICS --> K
+
+  HEALTH[Deal Health] --> E
+  HEALTH --> RECOVERY[Revenue Recovery]
+  RECOVERY --> NEXT[Next Action]
+  NEXT --> F
 ```
 
 ## 3. Regra central do produto
@@ -224,6 +229,43 @@ Banco:
 
 Contrato completo: `docs/ROUTER.md`.
 
+### 4.7 Commercial Intelligence
+
+```mermaid
+flowchart LR
+  CHANGE[Deal / proposta / mensagem / tarefa] --> EVENT[Domain Event]
+  EVENT --> JOB[commercial_intelligence]
+  JOB --> HEALTH[Deal Health]
+  HEALTH -->|at risk| RECOVERY[Revenue Recovery Case]
+  HEALTH --> NEXT[Next Action]
+  NEXT --> PROPOSAL[Action Proposal]
+  PROPOSAL --> AUTH[Authorization]
+  AUTH --> ADAPTER[Adapter + Verify]
+```
+
+**Health ≠ Recovery ≠ Next Action ≠ Execution.**
+
+- Deal Health diagnostica e explica.
+- Revenue Recovery mede pipeline exposto, sem fingir previsão de recuperação.
+- Next Action recomenda o próximo passo.
+- Router governa a autorização/execução.
+
+Código:
+- `src/lib/server/intelligence/deal-health.ts`
+- `src/lib/server/intelligence/next-action.ts`
+- `src/lib/server/intelligence/revenue-recovery.ts`
+- `src/lib/server/intelligence/scanner.ts`
+- `src/lib/server/intelligence/summary.ts`
+
+Banco:
+- `deal_health_snapshots`
+- `deal_health_current`
+- `next_action_recommendations`
+- `revenue_recovery_cases`
+- `revenue_recovery_summary`
+
+Contrato completo: `docs/COMMERCIAL_INTELLIGENCE.md`.
+
 ## 5. Mapa de domínio → código → banco
 
 | Domínio | Código principal | Tabelas / views |
@@ -248,6 +290,7 @@ Contrato completo: `docs/ROUTER.md`.
 | API pública | public-api/ + app/api/v1 | api_keys, usage_* |
 | Privacidade | privacy/ | privacy_requests |
 | Analytics | analytics/ | deal_stage_history, deal_velocity |
+| Commercial Intelligence | intelligence/ | deal_health_snapshots, next_action_recommendations, revenue_recovery_cases |
 | Billing SaaS | billing/ | tenant_subscriptions, usage_events, usage_counters |
 | IA | ai/ | knowledge entries + contexto do domínio |
 | Platform | platform/ + instrumentation | AI Gateway, PostHog, OTel/Langfuse |
@@ -271,6 +314,7 @@ flowchart TB
   WORKER --> AUTO[automation engine]
   WORKER --> ROUTER
   WORKER --> EXEC[governed action executor]
+  WORKER --> INTEL[commercial intelligence]
   WORKER --> WEBHOOK[webhook processor]
   WORKER --> IMPORT[import processor]
 
@@ -342,6 +386,14 @@ Inbound, jobs, automações, webhooks, usage e importações precisam tolerar re
 ### Providers
 Domínio não conhece detalhes de WAHA/Resend. Provider é adapter.
 
+### Commercial Intelligence
+- score precisa ser explicável;
+- valor exposto não é promessa de recuperação;
+- no máximo um Recovery Case ativo por deal;
+- no máximo uma Next Action corrente por deal;
+- mudança de contexto invalida recomendação obsoleta;
+- recomendação material vira Action Proposal, nunca write direto.
+
 ### Router
 - evento é gatilho, não autorização;
 - Action Proposal nunca executa diretamente;
@@ -373,6 +425,7 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 | roteamento de eventos/capabilities | `src/lib/server/router/policy.ts` + `capabilities.ts` |
 | ações propostas/autorizadas | `src/lib/server/router/` |
 | adapters governados | `src/lib/server/router/adapters/` |
+| deal health / receita em risco | `src/lib/server/intelligence/` |
 | envio WhatsApp | `src/lib/server/whatsapp/` + outbound |
 | conexão/QR WAHA | `src/lib/server/whatsapp/waha-admin.ts` |
 | envio e-mail | `src/lib/server/email/` |
@@ -404,6 +457,9 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 - automações/jobs/outbox;
 - Event Router + capability owners;
 - Action Proposal → Authorized Intent → Adapter → Verify;
+- Deal Health Score explicável;
+- Revenue Recovery Engine;
+- Next Action Engine;
 - importação CSV;
 - API pública inicial;
 - privacidade;

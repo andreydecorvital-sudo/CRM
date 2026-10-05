@@ -20,6 +20,13 @@ function payloadUuid(intent: AuthorizedIntent, key: string) {
   return uuid(intent.payload?.[key])
 }
 
+function guardOf(intent: AuthorizedIntent) {
+  const value = intent.payload?.guard
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
 async function requireTenantEntity(input: {
   table: "contacts" | "deals" | "conversations"
   tenantId: string
@@ -50,8 +57,84 @@ const taskCreateAdapter: ActionAdapter = {
     const assignedTo = payloadUuid(intent,"assignedTo")
 
     if (contactId) await requireTenantEntity({ table:"contacts",tenantId:intent.tenant_id,id:contactId })
-    if (dealId) await requireTenantEntity({ table:"deals",tenantId:intent.tenant_id,id:dealId })
-    if (conversationId) await requireTenantEntity({ table:"conversations",tenantId:intent.tenant_id,id:conversationId })
+
+    const guard = guardOf(intent)
+    let dealState: {
+      owner_user_id: string | null
+      next_followup_at: string | null
+      won_at: string | null
+      lost_at: string | null
+    } | null = null
+
+    if (dealId) {
+      const deals = await supabaseRest<Array<{
+        id: string
+        owner_user_id: string | null
+        next_followup_at: string | null
+        won_at: string | null
+        lost_at: string | null
+      }>>(
+        "GET",
+        `/deals?id=eq.${encodeURIComponent(dealId)}&tenant_id=eq.${encodeURIComponent(intent.tenant_id)}&select=id,owner_user_id,next_followup_at,won_at,lost_at&limit=1`,
+      )
+      dealState = Array.isArray(deals) ? deals[0] ?? null : null
+      if (!dealState) throw new Error("Deal fora do tenant ou inexistente.")
+      if (dealState.won_at || dealState.lost_at) throw new Error("Ação obsoleta: deal já encerrado.")
+
+      if (guard.ownerMissing === true && dealState.owner_user_id) {
+        throw new Error("Ação obsoleta: deal já possui responsável.")
+      }
+
+      if (guard.followupOverdue === true) {
+        const followup = dealState.next_followup_at ? Date.parse(dealState.next_followup_at) : NaN
+        if (!Number.isFinite(followup) || followup >= Date.now()) {
+          throw new Error("Ação obsoleta: follow-up não está mais vencido.")
+        }
+      }
+    }
+
+    if (conversationId) {
+      if (guard.customerWaiting === true) {
+        const conversations = await supabaseRest<Array<{
+          id: string
+          status: string
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+        }>>(
+          "GET",
+          `/conversations?id=eq.${encodeURIComponent(conversationId)}&tenant_id=eq.${encodeURIComponent(intent.tenant_id)}&select=id,status,last_inbound_at,last_outbound_at&limit=1`,
+        )
+        const conversation = Array.isArray(conversations) ? conversations[0] ?? null : null
+        if (!conversation) throw new Error("Conversa fora do tenant ou inexistente.")
+        const inbound = conversation.last_inbound_at ? Date.parse(conversation.last_inbound_at) : NaN
+        const outbound = conversation.last_outbound_at ? Date.parse(conversation.last_outbound_at) : NaN
+        if (
+          conversation.status === "resolved"
+          || !Number.isFinite(inbound)
+          || (Number.isFinite(outbound) && outbound >= inbound)
+        ) {
+          throw new Error("Ação obsoleta: cliente não está mais aguardando resposta.")
+        }
+      } else {
+        await requireTenantEntity({ table:"conversations",tenantId:intent.tenant_id,id:conversationId })
+      }
+    } else if (guard.customerWaiting === true) {
+      throw new Error("Ação bloqueada: guard customerWaiting exige conversationId.")
+    }
+
+    const requiredProposalStatus = str(guard.proposalStatus,40)
+    if (requiredProposalStatus) {
+      const proposalId = payloadUuid(intent,"proposalId")
+      if (!proposalId) throw new Error("Ação bloqueada: guard de proposta exige proposalId.")
+      const proposals = await supabaseRest<Array<{ id: string; status: string; deal_id: string | null }>>(
+        "GET",
+        `/proposals?id=eq.${encodeURIComponent(proposalId)}&tenant_id=eq.${encodeURIComponent(intent.tenant_id)}&select=id,status,deal_id&limit=1`,
+      )
+      const proposal = Array.isArray(proposals) ? proposals[0] ?? null : null
+      if (!proposal || proposal.deal_id !== dealId || proposal.status !== requiredProposalStatus) {
+        throw new Error("Ação obsoleta: estado atual da proposta mudou.")
+      }
+    }
 
     if (assignedTo) {
       const members = await supabaseRest<Array<{ user_id: string }>>(
@@ -205,6 +288,11 @@ const dealFollowUpAdapter: ActionAdapter = {
     const deal = Array.isArray(rows) ? rows[0] : null
     if (!deal) throw new Error("Deal fora do tenant ou inexistente.")
     if (deal.won_at || deal.lost_at) throw new Error("Deal já está encerrado.")
+
+    const guard = guardOf(intent)
+    if (guard.followupMissing === true && deal.next_followup_at) {
+      throw new Error("Ação obsoleta: deal já possui próximo follow-up.")
+    }
 
     const dueRaw = str(intent.payload?.dueAt,120)
     const minutes = Number(intent.payload?.dueInMinutes ?? 1440)
