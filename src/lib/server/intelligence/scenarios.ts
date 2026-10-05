@@ -129,7 +129,7 @@ export const intelligenceGoldenScenarios = [
       nextAction:"Definir responsável e retomar negociação",
     },
   },
-] as const
+]
 
 export function runGoldenScenarios() {
   return intelligenceGoldenScenarios.map(scenario => {
