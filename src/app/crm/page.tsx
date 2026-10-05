@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 const stages = [
   ["Novo lead", ["Mariana Costa", "Casa Nobre"]],
   ["Qualificado", ["Studio Lima"]],
@@ -9,8 +11,11 @@ const stages = [
 export default function CrmPage() {
   return (
     <div className="mx-auto max-w-[1400px]">
-      <div className="mb-6"><p className="text-sm text-violet-300">Pipeline</p><h1 className="mt-1 text-3xl font-semibold">CRM</h1><p className="mt-2 text-sm text-white/50">Filtre por vendedor, interesse, cidade, origem, tag, temperatura e tempo sem resposta.</p></div>
-      <div className="mb-5 flex flex-wrap gap-2">{["Todos", "Quentes", "Sem resposta", "Hoje", "WhatsApp"].map((f, i) => <button key={f} className={`rounded-full border px-3 py-1.5 text-xs ${i === 0 ? "border-violet-400/40 bg-violet-500/15" : "border-white/10 bg-white/5 text-white/60"}`}>{f}</button>)}</div>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div><p className="text-sm text-violet-300">Pipeline</p><h1 className="mt-1 text-3xl font-semibold">CRM</h1><p className="mt-2 text-sm text-white/50">Filtre por vendedor, interesse, cidade, origem, tag, temperatura, recorrência e tempo sem resposta.</p></div>
+        <Link href="/customers" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm">Ver clientes recorrentes</Link>
+      </div>
+      <div className="mb-5 flex flex-wrap gap-2">{["Todos", "Quentes", "Sem resposta", "Recorrentes", "VIP", "Em risco", "Hoje", "WhatsApp"].map((f, i) => <button key={f} className={`rounded-full border px-3 py-1.5 text-xs ${i === 0 ? "border-violet-400/40 bg-violet-500/15" : "border-white/10 bg-white/5 text-white/60"}`}>{f}</button>)}</div>
       <div className="grid gap-4 overflow-x-auto xl:grid-cols-5">
         {stages.map(([stage, contacts]) => (
           <section key={stage as string} className="min-w-[250px] rounded-2xl border border-white/10 bg-white/[0.025] p-3">

@@ -10,16 +10,15 @@ Atendimento automático + CRM multiempresa, extraído da arquitetura MIRA/WhatsA
 - WhatsApp provider adapter (WAHA primeiro; Meta/BSP depois)
 - MIRA em modo assistido por padrão
 
-## MVP
+## Módulos atuais
 
 - Inbox de atendimento
-- contatos e tags
-- funil CRM
-- leads/deals
-- handoff humano
+- contatos, tags e pipeline
+- leads/deals e handoff humano
 - webhook WhatsApp idempotente
-- auditoria
-- multi-tenant
+- auditoria multi-tenant
+- **253 · Recorrência:** compras, LTV, ticket médio, 1ª compra, recorrente, VIP, em risco e inativo
+- **257 · Avaliações:** fila pós-venda, cooldown, link público, nota, feedback e auditoria
 
 ## Rodar
 
@@ -29,11 +28,20 @@ npm install
 npm run dev
 ```
 
-Aplique `supabase/migrations/202610050001_init_mira_crm.sql` em um projeto Supabase novo e isolado.
+Para um projeto Supabase novo e isolado, aplique na ordem:
+
+1. `supabase/migrations/202610050001_init_mira_crm.sql`
+2. `supabase/migrations/202610050002_customer_lifecycle_reviews.sql`
 
 ## Segurança
 
 Não copie secrets do VitalHub. Use um Supabase próprio, novas chaves e novas variáveis de ambiente. O webhook exige `x-mira-webhook-secret`.
+
+A v0.2 move o helper de membership para o schema privado, restringe o RPC de ingestão ao `service_role`, usa RLS e grants explícitos e cria views com `security_invoker`.
+
+## Avaliações
+
+O coletor não faz review gating: a URL pública de avaliação pode ser oferecida a qualquer cliente que conclua o formulário, independentemente da nota interna. A automação nasce desligada por tenant e só agenda mensagens quando `review_enabled` e `review_auto_send_enabled` estiverem ativos.
 
 ## Origem técnica
 
