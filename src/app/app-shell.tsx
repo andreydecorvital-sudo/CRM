@@ -48,7 +48,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="border-b border-white/10 bg-[#0c0f15] p-5 md:sticky md:top-0 md:h-screen md:border-b-0 md:border-r">
         <Link href="/" className="mb-7 flex items-center gap-3 text-lg font-semibold">
           <span className="grid size-9 place-items-center rounded-xl bg-violet-600"><Sparkles size={18} /></span>
-          MIRA CRM
+          CRM
         </Link>
         <nav className="grid gap-1.5">
           {nav.map(({ href, label, icon: Icon }) => {
@@ -65,9 +65,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="mt-7 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-white/30">Modo MIRA</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-white/30">Modo IA</p>
           <div className="mt-2 flex items-center justify-between"><strong className="text-sm">Assistido</strong><span className="size-2 rounded-full bg-emerald-400" /></div>
-          <p className="mt-2 text-xs leading-5 text-white/40">Automação executa apenas regras liberadas por tenant.</p>
+          <p className="mt-2 text-xs leading-5 text-white/40">A IA executa apenas ações liberadas pelas políticas do tenant.</p>
         </div>
       </aside>
       <main className="p-5 md:p-8">{children}</main>

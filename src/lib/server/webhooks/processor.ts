@@ -142,7 +142,7 @@ export async function processWebhookDelivery(deliveryId: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "MIRA-CRM-Webhooks/1.0",
+        "User-Agent": "CRM-Webhooks/1.0",
         "X-CRM-Delivery": delivery.id,
         "X-CRM-Event": event.event_type,
         ...(signature ? { "X-CRM-Signature": `sha256=${signature}` } : {}),

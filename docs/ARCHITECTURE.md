@@ -1,4 +1,4 @@
-# MIRA CRM — arquitetura
+# CRM — arquitetura
 
 ## Princípios
 
@@ -12,7 +12,7 @@
 
 ## Fluxo de negócio
 
-WhatsApp → contato/conversa → fila/SLA → MIRA/humano → deal → follow-up → proposta → venda → recorrência → avaliação → reativação.
+WhatsApp → contato/conversa → fila/SLA → IA/humano → deal → follow-up → proposta → venda → recorrência → avaliação → reativação.
 
 ## Event-driven core
 

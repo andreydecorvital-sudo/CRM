@@ -10,7 +10,7 @@ const cards = [
 ]
 
 const operations = [
-  { href: "/inbox", title: "Atendimento", detail: "Fila, SLA, MIRA e handoff humano.", value: "24 abertas" },
+  { href: "/inbox", title: "Atendimento", detail: "Fila, SLA, IA e handoff humano.", value: "24 abertas" },
   { href: "/tasks", title: "Próximas ações", detail: "Follow-ups, reuniões e retornos.", value: "4 atrasadas" },
   { href: "/proposals", title: "Negociação", detail: "Propostas enviadas, vistas e aceitas.", value: "17 abertas" },
   { href: "/customers", title: "Carteira", detail: "LTV, VIP, risco e reativação.", value: "41 em risco" },
@@ -21,7 +21,7 @@ export default function Home() {
     <div className="mx-auto max-w-7xl">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-sm text-violet-300">MIRA · Revenue OS</p>
+          <p className="mb-2 text-sm text-violet-300">CRM · Revenue OS</p>
           <h1 className="text-3xl font-semibold tracking-tight">Do primeiro contato até a recompra.</h1>
           <p className="mt-2 max-w-3xl text-white/55">Atendimento, execução comercial, propostas, origem, recorrência e reputação em uma única linha do tempo do cliente.</p>
         </div>

@@ -1,4 +1,4 @@
-# MIRA CRM
+# CRM
 
 Backend de CRM + atendimento + automação comercial multiempresa.
 
@@ -14,7 +14,7 @@ Backend de CRM + atendimento + automação comercial multiempresa.
 - timeline, notas e custom fields
 - preferências/consentimento por canal
 - lead scoring explicável
-- base de conhecimento full-text para MIRA
+- base de conhecimento full-text para o motor de IA
 - eventos de domínio e motor de automações
 - durable jobs, retry e dead jobs
 - outbox de mensagens
@@ -41,7 +41,7 @@ Backend:
 
 Aplicar apenas em um Supabase dedicado ao CRM, na ordem:
 
-1. `202610050001_init_mira_crm.sql`
+1. `202610050001_init_crm.sql`
 2. `202610050002_customer_lifecycle_reviews.sql`
 3. `202610050003_commercial_operations.sql`
 4. `202610050004_customer_intelligence.sql`

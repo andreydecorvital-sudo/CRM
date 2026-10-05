@@ -1,4 +1,4 @@
--- MIRA CRM v0.1 · multi-tenant CRM + WhatsApp inbox
+-- CRM v0.1 · multi-tenant CRM + WhatsApp inbox
 create extension if not exists pgcrypto;
 
 create table if not exists public.tenants (
@@ -82,7 +82,7 @@ create table if not exists public.messages (
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   external_id text not null,
   direction text not null check (direction in ('inbound','outbound')),
-  actor text not null check (actor in ('contact','mira','human','system')),
+  actor text not null check (actor in ('contact','ai','human','system')),
   message_type text not null default 'text',
   text text not null default '',
   status text not null default 'received' check (status in ('received','draft','queued','sent','delivered','read','failed')),
@@ -146,7 +146,7 @@ create table if not exists public.whatsapp_connections (
 create table if not exists public.audit_log (
   id bigserial primary key,
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  actor_type text not null check (actor_type in ('user','mira','system','provider')),
+  actor_type text not null check (actor_type in ('user','ai','system','provider')),
   actor_id text,
   action text not null,
   entity_type text not null,

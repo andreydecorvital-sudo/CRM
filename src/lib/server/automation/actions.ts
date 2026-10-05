@@ -137,7 +137,7 @@ export async function executeAutomationAction(action: AutomationAction, context:
         scheduled_at: str(rendered.scheduledAt) || new Date().toISOString(),
         dedupe_key: automationDedupe(context, "message"),
         metadata: {
-          actor: "mira",
+          actor: "ai",
           automationRuleId: context.rule.id,
           eventId: context.event.id,
         },

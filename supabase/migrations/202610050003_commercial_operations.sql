@@ -1,4 +1,4 @@
--- MIRA CRM v0.3 · commercial operations
+-- CRM v0.3 · commercial operations
 -- Follow-ups, departments/routing, attribution and proposals.
 
 create table if not exists public.departments (
@@ -300,7 +300,7 @@ set search_path = ''
 as $$
 begin
   if new.direction = 'outbound'
-     and new.actor in ('human','mira')
+     and new.actor in ('human','ai')
      and new.status in ('sent','delivered','read')
   then
     update public.conversations

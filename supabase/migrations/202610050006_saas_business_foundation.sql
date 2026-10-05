@@ -1,4 +1,4 @@
--- MIRA CRM v0.6 · B2B accounts, catalog, history and SaaS entitlements.
+-- CRM v0.6 · B2B accounts, catalog, history and SaaS entitlements.
 
 create table if not exists public.accounts (
   id uuid primary key default gen_random_uuid(),

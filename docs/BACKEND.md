@@ -21,7 +21,7 @@ Produtos/serviços vivem em `catalog_items`. Price books suportam preço por qua
 ## Lead scoring
 Regras por evento/campo geram score events idempotentes. O agregado classifica cold / warm / hot com thresholds por tenant.
 
-## MIRA Knowledge
+## AI Knowledge Base
 FAQ, política, produto, processo e scripts usam full-text search em português no Postgres. Não depende de embeddings pagos.
 
 ## Automação

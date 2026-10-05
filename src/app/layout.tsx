@@ -3,7 +3,7 @@ import AppShell from "./app-shell"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "MIRA CRM",
+  title: "CRM",
   description: "Atendimento automático + CRM multiempresa",
 }
 

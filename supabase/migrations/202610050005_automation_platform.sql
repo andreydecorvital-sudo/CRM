@@ -1,4 +1,4 @@
--- MIRA CRM v0.5 · automation platform
+-- CRM v0.5 · automation platform
 -- Transactional domain events, durable jobs, automation rules, outbound outbox,
 -- webhook delivery, API keys and user notifications.
 

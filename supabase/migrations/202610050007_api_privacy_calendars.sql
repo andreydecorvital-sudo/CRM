@@ -1,4 +1,4 @@
--- MIRA CRM v0.7 · public API support, privacy workflows and business calendars.
+-- CRM v0.7 · public API support, privacy workflows and business calendars.
 
 create table if not exists public.privacy_requests (
   id uuid primary key default gen_random_uuid(),

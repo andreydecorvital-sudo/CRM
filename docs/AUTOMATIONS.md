@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Automação no MIRA CRM é orientada a eventos. Regras não ficam acopladas ao WhatsApp nem ao frontend.
+A automação do CRM é orientada a eventos. Regras não ficam acopladas ao WhatsApp nem ao frontend.
 
 Fluxo:
 

@@ -1,4 +1,4 @@
--- MIRA CRM v0.8 · async contact imports + business-time SLA.
+-- CRM v0.8 · async contact imports + business-time SLA.
 
 alter table public.job_queue
   drop constraint if exists job_queue_kind_check;

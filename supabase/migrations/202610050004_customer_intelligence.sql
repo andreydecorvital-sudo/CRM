@@ -1,5 +1,5 @@
--- MIRA CRM v0.4 · customer intelligence foundation
--- Backend-first: timeline, custom fields, consent, lead scoring, saved views and MIRA knowledge.
+-- CRM v0.4 · customer intelligence foundation
+-- Backend-first: timeline, custom fields, consent, lead scoring, saved views and AI knowledge.
 
 alter table public.customer_settings
   add column if not exists lead_score_warm_threshold integer not null default 25,
@@ -572,7 +572,7 @@ select
   case when m.direction = 'inbound' then 'message.inbound' else 'message.outbound' end,
   m.id::text,
   case
-    when m.actor = 'mira' then 'Mensagem da MIRA'
+    when m.actor = 'ai' then 'Mensagem da IA'
     when m.actor = 'human' then 'Mensagem da equipe'
     else 'Mensagem do cliente'
   end,

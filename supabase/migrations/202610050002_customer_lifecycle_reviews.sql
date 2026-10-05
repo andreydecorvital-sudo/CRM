@@ -1,4 +1,4 @@
--- MIRA CRM v0.2 · customer lifecycle (253) + review collector (257)
+-- CRM v0.2 · customer lifecycle (253) + review collector (257)
 -- Também endurece o boundary multi-tenant criado na v0.1 para o padrão atual do Supabase.
 
 create schema if not exists private;

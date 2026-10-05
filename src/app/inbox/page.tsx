@@ -1,6 +1,6 @@
 const conversations = [
   { name: "Mariana Costa", text: "Queria orçamento para 30 unidades", tag: "Lead quente", time: "2 min", dept: "Comercial", sla: "7m" },
-  { name: "Rafael Lima", text: "Vocês conseguem entregar amanhã?", tag: "MIRA", time: "8 min", dept: "Comercial", sla: "9m" },
+  { name: "Rafael Lima", text: "Vocês conseguem entregar amanhã?", tag: "IA", time: "8 min", dept: "Comercial", sla: "9m" },
   { name: "Studio Forma", text: "Preciso falar com financeiro", tag: "Handoff", time: "21 min", dept: "Financeiro", sla: "18m" },
 ]
 
@@ -40,7 +40,7 @@ export default function InboxPage() {
           <div className="flex-1 space-y-4 p-6">
             <div className="max-w-[72%] rounded-2xl rounded-tl-md bg-white/8 p-4 text-sm">Oi, queria orçamento para 30 unidades. Tem preço melhor?</div>
             <div className="ml-auto max-w-[72%] rounded-2xl rounded-tr-md border border-violet-400/20 bg-violet-500/10 p-4 text-sm">
-              <p className="mb-2 text-xs font-semibold text-violet-300">Sugestão da MIRA</p>
+              <p className="mb-2 text-xs font-semibold text-violet-300">Sugestão da IA</p>
               Consigo te ajudar. Para montar a condição correta, qual produto e cidade de entrega?
             </div>
           </div>

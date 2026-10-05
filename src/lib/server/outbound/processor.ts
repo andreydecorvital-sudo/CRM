@@ -111,7 +111,7 @@ export async function processOutboundMessage(messageId: string) {
 
     if (message.conversation_id) {
       const actorRaw = metadataString(message.metadata, "actor")
-      const actor = ["mira","human","system"].includes(actorRaw) ? actorRaw : "system"
+      const actor = ["ai","human","system"].includes(actorRaw) ? actorRaw : "system"
 
       const existing = await supabaseRest<Array<{ id: string }>>(
         "GET",

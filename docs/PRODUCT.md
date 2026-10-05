@@ -1,10 +1,10 @@
-# MIRA CRM — definição de produto
+# CRM — definição de produto
 
 ## Tese
 
-O MIRA CRM é um Revenue/Customer OS para PMEs. Ele conecta atendimento, execução comercial, negociação, carteira, pós-venda e inteligência do cliente.
+O produto é um Revenue/Customer OS para PMEs. Ele conecta atendimento, execução comercial, negociação, carteira, pós-venda e inteligência do cliente.
 
-A IA não é um botão. A MIRA opera dentro do fluxo, respeitando regras e permissões.
+A IA é uma camada independente do produto. Ela opera dentro do fluxo apenas quando habilitada, respeitando regras, permissões e políticas próprias do CRM.
 
 ## Fluxo
 
@@ -62,7 +62,7 @@ Empresas podem possuir vários contatos, responsável e carteira consolidada. Is
 - first/last touch
 - knowledge base
 - domain events
-- MIRA com contexto operacional
+- IA com contexto operacional
 
 ## Plataforma SaaS
 
