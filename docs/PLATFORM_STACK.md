@@ -153,3 +153,29 @@ Endpoint interno:
 Protegido por `CRM_INTERNAL_SECRET`.
 
 Ele mostra apenas readiness booleana; nunca retorna secrets.
+
+
+## Worker scheduling
+
+A fila durável é drenada por:
+
+`GET /api/internal/jobs/tick?limit=25`
+
+Em Vercel, `vercel.json` agenda o tick a cada minuto.
+
+Autorização aceita:
+- `Authorization: Bearer $CRON_SECRET` para Vercel Cron;
+- `CRM_WORKER_SECRET` para invocação operacional/manual.
+
+O endpoint nunca deve aceitar execução sem um dos secrets configurados.
+
+O tick processa:
+- Event Router;
+- Automation Engine;
+- Commercial Intelligence;
+- governed action execution;
+- outbound messages;
+- webhooks;
+- contact imports.
+
+O Cron é mecanismo de drenagem/recovery. Fluxos orientados a webhook continuam criando jobs imediatamente no banco.

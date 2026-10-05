@@ -8,15 +8,19 @@ function secureEqual(left: string, right: string) {
 }
 
 function authorized(request: Request) {
-  const expected = String(process.env.CRM_WORKER_SECRET || "")
-  if (!expected) return false
+  const workerSecret = String(process.env.CRM_WORKER_SECRET || "").trim()
+  const cronSecret = String(process.env.CRON_SECRET || "").trim()
 
   const bearer = request.headers.get("authorization") || ""
   const token = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : ""
-  const header = request.headers.get("x-crm-worker-secret") || ""
+  const header = String(request.headers.get("x-crm-worker-secret") || "").trim()
   const received = token || header
 
-  return Boolean(received) && secureEqual(received, expected)
+  if (!received) return false
+
+  return [workerSecret,cronSecret]
+    .filter(Boolean)
+    .some(expected => secureEqual(received,expected))
 }
 
 async function handle(request: Request) {
