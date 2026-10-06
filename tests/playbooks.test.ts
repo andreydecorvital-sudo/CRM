@@ -4,7 +4,7 @@ import { getPlaybookTemplate } from "../src/lib/server/playbooks/templates"
 import { simulatePlaybook } from "../src/lib/server/playbooks/simulator"
 import type { DomainEvent } from "../src/lib/server/automation/types"
 import { validatePlaybook } from "../src/lib/server/playbooks/validator"
-import { parsePlaybookDraftFromModelText } from "../src/lib/server/playbooks/authoring"
+import { parsePlaybookDraftFromModelText } from "../src/lib/server/playbooks/draft-parser"
 
 function event(input: Partial<DomainEvent> & Pick<DomainEvent,"event_type">): DomainEvent {
   return {
