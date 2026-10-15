@@ -1,66 +1,65 @@
 import Link from "next/link"
+import { ArrowUpRight, Blocks, Globe2, MessageSquareText, ShieldCheck, UsersRound, Workflow } from "lucide-react"
 
-const cards = [
-  ["Conversas abertas", "24", "+6 hoje"],
-  ["SLA em risco", "3", "ação agora"],
-  ["Follow-ups", "12", "4 atrasados"],
-  ["Propostas abertas", "17", "R$ 48,3 mil"],
-  ["Clientes recorrentes", "126", "38 VIP"],
-  ["Avaliações", "4,6 ★", "43% resposta"],
-]
-
-const operations = [
-  { href: "/inbox", title: "Atendimento", detail: "Fila, SLA, IA e handoff humano.", value: "24 abertas" },
-  { href: "/tasks", title: "Próximas ações", detail: "Follow-ups, reuniões e retornos.", value: "4 atrasadas" },
-  { href: "/proposals", title: "Negociação", detail: "Propostas enviadas, vistas e aceitas.", value: "17 abertas" },
-  { href: "/customers", title: "Carteira", detail: "LTV, VIP, risco e reativação.", value: "41 em risco" },
+const modules = [
+  { href:"/integrations", title:"Integrações", detail:"Site, WhatsApp e API: prepare os canais de entrada.", icon:Globe2 },
+  { href:"/automations", title:"Automações", detail:"Gatilhos, condições, playbooks e simulação.", icon:Workflow },
+  { href:"/inbox", title:"Atendimento", detail:"Conversas, filas e passagem para humanos.", icon:MessageSquareText },
+  { href:"/crm", title:"Relacionamento", detail:"Contatos, negociações e acompanhamento comercial.", icon:UsersRound },
 ]
 
 export default function Home() {
   return (
     <div className="mx-auto max-w-7xl">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="mb-2 text-sm text-violet-300">CRM · Revenue OS</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Do primeiro contato até a recompra.</h1>
-          <p className="mt-2 max-w-3xl text-white/55">Atendimento, execução comercial, propostas, origem, recorrência e reputação em uma única linha do tempo do cliente.</p>
+      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/20 via-[#121522] to-[#0d1017] p-7 md:p-10">
+        <div className="relative z-10 max-w-3xl">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">CRM · Plataforma SaaS</p>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Atenda, organize e automatize o relacionamento com seus clientes.</h1>
+          <p className="mt-4 text-sm leading-7 text-white/60">
+            Uma base única para leads que chegam pelo site, WhatsApp e integrações,
+            com execução comercial orientada a eventos e regras auditáveis por empresa.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/integrations" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold hover:bg-violet-500">
+              Conectar um canal <ArrowUpRight size={16} />
+            </Link>
+            <Link href="/automations" className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-medium hover:bg-white/10">
+              Explorar automações
+            </Link>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link href="/tasks" className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm">Ver tarefas</Link>
-          <Link href="/settings/whatsapp" className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium">Conectar WhatsApp</Link>
-        </div>
-      </div>
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {cards.map(([label, value, detail]) => (
-          <article key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-sm text-white/45">{label}</p>
-            <strong className="mt-3 block text-2xl">{value}</strong>
-            <span className="mt-2 block text-xs text-emerald-300">{detail}</span>
-          </article>
-        ))}
       </section>
-
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
-        {operations.map(item => (
-          <Link key={item.href} href={item.href} className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-violet-400/20 hover:bg-violet-500/[0.04]">
-            <div className="flex items-start justify-between gap-4">
-              <div><h2 className="font-semibold">{item.title}</h2><p className="mt-2 text-sm text-white/45">{item.detail}</p></div>
-              <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-white/55">{item.value}</span>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Central de trabalho</h2>
+        <span className="rounded-full border border-amber-300/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
+          Em preparação para piloto · não conectado a dados de clientes
+        </span>
+      </div>
+      <section className="mt-4 grid gap-4 md:grid-cols-2">
+        {modules.map(({href,title,detail,icon:Icon}) => (
+          <Link key={href} href={href} className="group rounded-2xl border border-white/10 bg-white/[0.035] p-6 transition hover:border-violet-400/30 hover:bg-violet-500/[0.05]">
+            <div className="flex items-start justify-between">
+              <span className="grid size-11 place-items-center rounded-xl bg-violet-500/10 text-violet-300"><Icon size={21}/></span>
+              <ArrowUpRight size={17} className="text-white/30 group-hover:text-violet-300"/>
             </div>
+            <h3 className="mt-5 text-lg font-semibold">{title}</h3>
+            <p className="mt-2 text-sm leading-6 text-white/50">{detail}</p>
           </Link>
         ))}
       </section>
-
-      <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-        <p className="text-xs uppercase tracking-[0.16em] text-white/30">Fluxo operacional</p>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          {["Origem", "Lead", "Atendimento", "Tarefa", "Proposta", "Venda", "Recorrência", "Avaliação", "Reativação"].map((step,index,array) => (
-            <div key={step} className="flex items-center gap-2">
-              <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5">{step}</span>
-              {index < array.length - 1 ? <span className="text-white/20">→</span> : null}
-            </div>
-          ))}
+      <section className="mt-7 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+          <div className="flex items-center gap-2"><Blocks size={19} className="text-violet-300"/><h2 className="font-semibold">Fluxo do CRM</h2></div>
+          <p className="mt-4 text-sm leading-7 text-white/60">
+            Origem → contato → atendimento → oportunidade → próxima ação → proposta → venda → recorrência.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+          <div className="flex items-center gap-2"><ShieldCheck size={19} className="text-emerald-300"/><h2 className="font-semibold">Ativação controlada</h2></div>
+          <p className="mt-4 text-sm leading-7 text-white/60">
+            Isolamento multiempresa, consentimento por canal, filas com retry e simulações antes de ativar uma automação.
+            Nenhum indicador fictício é apresentado como dado operacional.
+          </p>
         </div>
       </section>
     </div>

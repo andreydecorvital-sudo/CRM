@@ -107,3 +107,12 @@ Adiado até estabilizar backend:
 - Cron: worker tick a cada minuto
 - secrets internos/worker armazenados na Vercel
 - Supabase isolado: aguardando criação no org selecionado
+
+## SaaS / websites (15/10/2026)
+- [x] Fundação: tenant-safe website source, widget e endpoint de captação em branch/PR (sem deployment).
+- [x] Tela de integrações e catálogo de playbooks sem KPI fake.
+- [ ] Supabase isolado, migrações aplicadas, testes com leads reais e worker validado.
+- [ ] Login e onboarding de tenants, permissões e configuração self-service.
+- [ ] Workflow Builder com simulação, aprovação, ativação e logs por tenant.
+- [ ] WhatsApp Meta Cloud API/Embedded Signup, templates e compliance por cliente.
+- [ ] Quotas/billing, captura antispam de produção, LGPD e homologação.

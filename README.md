@@ -90,6 +90,13 @@ API key define tenant + scopes; o cliente nunca informa tenant arbitrariamente.
 
 Veja `docs/API.md`.
 
+## Websites e automações SaaS
+
+- Console de templates: `/automations` (não publica regras sem autenticação/aprovação).
+- Integrações: `/integrations`, endpoint `/api/public/sites/:siteId/leads` e widget `/api/public/widget.js?site=UUID`.
+- As fontes são provisionadas/ativadas pelo endpoint **interno** `/api/internal/website-sources` durante o piloto.
+- Veja `docs/WEBSITE_INTEGRATION.md` para segurança, instalação e limitações.
+
 ## WhatsApp
 
 Conexões são resolvidas por tenant. Fallback WAHA global é desabilitado por padrão e só existe para piloto controlado.
@@ -135,3 +142,4 @@ Veja `docs/WHATSAPP.md`.
 - `docs/EMAIL.md`
 - `docs/OPPORTUNITIES.md`
 - `docs/ROADMAP.md`
+- `docs/WEBSITE_INTEGRATION.md`
