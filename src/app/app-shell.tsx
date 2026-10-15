@@ -3,12 +3,14 @@
 import Link from "next/link"
 import {
   BarChart3,
+  Globe2,
   BriefcaseBusiness,
   ListTodo,
   MessageSquareText,
   PlugZap,
   Repeat2,
   Sparkles,
+  Zap,
   Star,
   UsersRound,
   Workflow,
@@ -25,6 +27,8 @@ const nav = [
   { href: "/sources", label: "Origens", icon: BarChart3 },
   { href: "/departments", label: "Equipes & Filas", icon: Workflow },
   { href: "/settings/whatsapp", label: "WhatsApp", icon: PlugZap },
+  { href: "/automations", label: "Automações", icon: Zap },
+  { href: "/integrations", label: "Integrações", icon: Globe2 },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
