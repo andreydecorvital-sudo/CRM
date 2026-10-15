@@ -105,6 +105,7 @@ declare
   v_receipt public.website_lead_receipts%rowtype;
   v_window timestamptz;
   v_attempts integer;
+  v_site_attempts integer;
   v_contact jsonb;
   v_contact_id uuid;
   v_event_id uuid;
@@ -144,13 +145,21 @@ begin
   end if;
 
   v_window := pg_catalog.date_trunc('hour', pg_catalog.now())
-    + pg_catalog.floor(pg_catalog.extract(minute from pg_catalog.now()) / 10) * interval '10 minutes';
+    + pg_catalog.floor(pg_catalog.date_part('minute',pg_catalog.now()) / 10) * interval '10 minutes';
   insert into public.website_lead_limits(site_id,fingerprint,window_start,attempts)
   values (p_site_id,p_request_fingerprint,v_window,1)
   on conflict (site_id,fingerprint,window_start)
   do update set attempts = public.website_lead_limits.attempts + 1
   returning attempts into v_attempts;
   if v_attempts > 10 then raise exception 'website_lead_rate_limited'; end if;
+
+  -- Site-wide ceiling prevents bypassing all limits by rotating spoofed IP headers.
+  insert into public.website_lead_limits(site_id,fingerprint,window_start,attempts)
+  values (p_site_id,pg_catalog.repeat('0',64),v_window,1)
+  on conflict (site_id,fingerprint,window_start)
+  do update set attempts = public.website_lead_limits.attempts + 1
+  returning attempts into v_site_attempts;
+  if v_site_attempts > 250 then raise exception 'website_lead_rate_limited'; end if;
 
   select public.crm_upsert_contact(
     v_source.tenant_id,trim(p_external_contact_id),trim(p_display_name),
