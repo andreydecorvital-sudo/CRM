@@ -318,6 +318,7 @@ O comportamento crítico também é validado sem banco por `docs/SIMULATION_LAB.
 | Event Router | router/ | event_router_dispatches, action_proposals, authorized_intents, action_execution_receipts |
 | Outbound | outbound/ | outbound_messages, message_templates |
 | API pública | public-api/ + app/api/v1 | api_keys, usage_* |
+| Captura em sites | website/ + app/api/public/sites | website_sources, website_lead_receipts, website_lead_limits |
 | Privacidade | privacy/ | privacy_requests |
 | Analytics | analytics/ | deal_stage_history, deal_velocity |
 | Commercial Intelligence | intelligence/ | deal_health_snapshots, next_action_recommendations, revenue_recovery_cases |
@@ -357,6 +358,12 @@ flowchart TB
   PLATFORM --> OTEL[OpenTelemetry]
   OTEL --> LF[Langfuse]
 ```
+
+### 6.1 Captação de leads via site do cliente
+
+`browser widget → validação de Origin/site → RPC restrita → contato + event + receipt atômicos → job de automação`.
+
+O identificador do site é público e não substitui autenticação. Exigir domínio exato, limites, proteção contra bots e isolamento por tenant. O endpoint público **não recebe tenantId**. O formulário só consente contato para responder à solicitação; marketing exige opt-in independente. A ativação de sites no piloto é administrativa e protegida por secret, não é onboarding self-service. Contrato: `docs/WEBSITE_INTEGRATION.md`.
 
 ## 7. WhatsApp lifecycle
 
@@ -474,6 +481,7 @@ Não introduzir dependência de Argoplace, MIRA ou VitalHub.
 | tarefa/follow-up | `src/lib/server/tasks/` |
 | Customer 360 | customers/timeline/custom-fields |
 | API externa | `src/app/api/v1/` + public-api |
+| Site do cliente | `src/app/api/public/sites/`, `src/lib/server/website/` |
 | LGPD | `src/lib/server/privacy/` |
 | métricas SaaS | billing/entitlements |
 | IA | `src/lib/server/ai/` + knowledge |
