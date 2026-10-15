@@ -29,7 +29,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   if new.owner_user_id is not null and not exists(
     select 1 from public.tenant_members tm
@@ -39,7 +39,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 revoke execute on function private.validate_account_owner() from public, anon, authenticated;
 

@@ -2416,7 +2416,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_proposal_id uuid;
   v_now timestamptz := now();
@@ -2465,7 +2465,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke execute on function private.sync_next_action_execution_receipt()
 from public, anon, authenticated;

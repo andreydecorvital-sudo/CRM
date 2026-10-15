@@ -8,6 +8,15 @@ const combined = contents.map(item => item.text).join("\n\n")
 const errors = []
 
 for (const { name, text } of contents) {
+  // Catch malformed dollar delimiters that pass the security scan but fail in PostgreSQL.
+  // Function bodies must use matching dollar quoting; standalone single '$' is invalid.
+  const lines = text.split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\\s*as \\$\\s*$/i.test(lines[i]) || /^\\s*\\$;\\s*$/.test(lines[i])) {
+      errors.push(`${name}:${i + 1}: delimiter SQL '$' isolado; usar '$$'.`)
+    }
+  }
+
   if (/set\s+search_path\s*=\s*public/i.test(text)) {
     errors.push(`${name}: SECURITY DEFINER/search_path não pode usar public.`)
   }
