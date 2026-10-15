@@ -4,13 +4,13 @@ import { isAllowedWebsiteOrigin, isUuid, normalizeWebsiteOrigin, parseWebsiteLea
 
 export const runtime = "nodejs"
 
-type Source = { id: string; tenant_id: string; allowed_origins: string[]; status: string }
+type Source = { id: string; tenant_id: string; name: string; privacy_policy_url: string | null; allowed_origins: string[]; status: string }
 type Params = { params: Promise<{ siteId: string }> }
 
 function cors(origin: string) {
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "600",
     "Cache-Control": "no-store",
@@ -25,7 +25,7 @@ async function verifiedSource(request: Request, siteId: string) {
 
   const rows = await supabaseRest<Source[]>(
     "GET",
-    `/website_sources?id=eq.${encodeURIComponent(siteId)}&status=eq.active&select=id,tenant_id,allowed_origins,status&limit=1`,
+    `/website_sources?id=eq.${encodeURIComponent(siteId)}&status=eq.active&select=id,tenant_id,name,privacy_policy_url,allowed_origins,status&limit=1`,
   )
   const source = Array.isArray(rows) ? rows[0] : null
   if (!source || !isAllowedWebsiteOrigin(origin,source.allowed_origins)) return null
@@ -40,6 +40,20 @@ export async function OPTIONS(request: Request, { params }: Params) {
     return new Response(null,{ status:204,headers:cors(site.origin) })
   } catch {
     return new Response(null,{ status:503 })
+  }
+}
+
+export async function GET(request: Request, { params }: Params) {
+  try {
+    const { siteId } = await params
+    const site = await verifiedSource(request,siteId)
+    if (!site || !site.source.privacy_policy_url) return Response.json({ error:"origin_or_site_denied" },{ status:403 })
+    return Response.json({
+      name:site.source.name,
+      privacyPolicyUrl:site.source.privacy_policy_url,
+    },{ headers:cors(site.origin) })
+  } catch {
+    return Response.json({ error:"temporarily_unavailable" },{ status:503 })
   }
 }
 

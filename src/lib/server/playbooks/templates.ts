@@ -2,6 +2,33 @@ import type { PlaybookDefinition } from "./types"
 
 export const playbookTemplates: PlaybookDefinition[] = [
   {
+    key:"website_new_lead_first_response",
+    name:"Novo lead do site: primeira ação",
+    description:"Ao receber um formulário do site autorizado, categoriza o contato e programa uma resposta comercial em até 10 minutos, sem disparar marketing.",
+    version:1,
+    triggerEvent:"website.lead_submitted",
+    conditions:{ all:[] },
+    actions:[
+      { type:"contact.tag", params:{ tag:"lead-site" } },
+      {
+        type:"task.create",
+        params:{
+          contactId:"{{event.contactId}}",
+          title:"Responder novo contato do site",
+          description:"Solicitação recebida pelo formulário. Ler a mensagem na origem e fazer o primeiro contato; não enviar campanha sem opt-in.",
+          kind:"follow_up",
+          priority:"high",
+          dueInMinutes:10,
+        },
+      },
+    ],
+    mode:"shadow",
+    priority:40,
+    stopOnMatch:false,
+    cooldownSeconds:0,
+    tags:["website","lead","first-response"],
+  },
+  {
     key:"high_ticket_paid_lead",
     name:"Lead pago de ticket alto",
     description:"Prioriza deals novos de mídia paga acima de R$ 5 mil e garante próximo passo.",
