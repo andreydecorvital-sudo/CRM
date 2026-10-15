@@ -1,16 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { ArrowRight, Check, ClipboardCopy, Code2, Globe2, Info, MessageCircle, ShieldCheck } from "lucide-react"
 
 export default function IntegrationsPage() {
   const [siteId,setSiteId] = useState("")
-  const [host,setHost] = useState("")
   const [copied,setCopied] = useState(false)
-  useEffect(() => { setHost(window.location.origin) },[])
   const valid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(siteId.trim())
-  const snippet = `<script async src="${host || "https://seu-crm.com"}/api/public/widget.js?site=${valid ? siteId.trim() : "ID_DO_SITE"}"></script>`
+  const snippet = `<script async src="https://SEU_CRM/api/public/widget.js?site=${valid ? siteId.trim() : "ID_DO_SITE"}"></script>`
 
   async function copy() {
     if (!valid) return
@@ -57,7 +55,7 @@ export default function IntegrationsPage() {
               className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-sm outline-none focus:border-violet-400"
             />
             <p className="mt-3 text-xs leading-5 text-white/45">
-              Esse identificador só funciona após o site ser criado, ter domínio autorizado e ser ativado.
+              Substitua SEU_CRM pelo domínio publicado do SaaS. O identificador só funciona após o site ser criado, ter domínio autorizado e ser ativado.
               Não é senha e não deve ser usado para autorizar chamadas administrativas.
             </p>
           </div>
