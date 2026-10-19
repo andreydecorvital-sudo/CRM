@@ -5,7 +5,7 @@ const COOKIE_TOKEN="crm_operator_token"
 const COOKIE_TENANT="crm_operator_tenant"
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 type Role="owner"|"admin"|"manager"|"agent"|"viewer"
-type Member={tenant_id:string;role:Role}
+type Member={tenant_id:string;role:Role;tenants:{id:string;status:string}|null}
 export type Operator={userId:string;tenantId:string;role:Role;accessToken:string}
 
 export function pilotConfigured(){return Boolean(operatorSupabaseConfig())}
@@ -14,9 +14,13 @@ function cookieOptions(maxAge:number) {
     path:"/",maxAge}
 }
 async function memberships(token:string,userId:string):Promise<Member[]>{
+  // PostgREST validates the end-user JWT and RLS on BOTH tables.
+  // Embedding the tenant eliminates an extra network round trip on every request.
   const rows=await operatorRest<Member[]>(
-    token,"GET",`/tenant_members?user_id=eq.${userId}&select=tenant_id,role&order=tenant_id.asc&limit=100`)
+    token,"GET",`/tenant_members?user_id=eq.${userId}&select=tenant_id,role,tenants!inner(id,status)&tenants.status=in.(active,trial)&order=tenant_id.asc&limit=100`)
   return Array.isArray(rows)?rows.filter(m=>UUID.test(m.tenant_id)
+    && m.tenants?.id===m.tenant_id
+    && ["active","trial"].includes(m.tenants.status)
     && ["owner","admin","manager","agent","viewer"].includes(m.role)):[]
 }
 
@@ -73,9 +77,6 @@ export async function operatorFromCookie():Promise<Operator|null>{
     // The tenant cookie is NOT an authorization grant; membership is checked again.
     const member=memberList.find(m=>m.tenant_id===requested)??memberList[0]
     if(!member)return null
-    const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
-      `/tenants?id=eq.${member.tenant_id}&select=id,status&limit=1`)
-    if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return null
     return {userId,tenantId:member.tenant_id,role:member.role,accessToken:token}
   }catch{return null}
 }
@@ -105,11 +106,7 @@ export async function signInOperator(email:string,password:string):Promise<SignI
     // Database provisioning may not be complete, but a valid Auth identity can still
     // reach the onboarding screen. Never issue a tenant cookie without verified membership.
     first=(await memberships(token,result.user.id))[0]
-    if(first){
-      const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
-        `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
-      if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))first=undefined
-    }
+
   }catch{first=undefined}
   const seconds=Math.max(1,Math.min(3600,Math.floor(result.expires_in||3600)-30))
   const store=await cookies()
