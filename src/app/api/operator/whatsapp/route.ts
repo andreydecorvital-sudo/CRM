@@ -10,6 +10,27 @@ type ConnectionRow = {
 }
 function configured(key:string){return Boolean(process.env[key]?.trim())}
 
+// Read-only probe. Does not create, start, stop or reconfigure WhatsApp sessions.
+async function liveSessionStatus(session:string):Promise<string|null> {
+  const base=process.env.WAHA_BASE_URL?.trim().replace(/\\/+$/,"")||""
+  const key=process.env.WAHA_API_KEY?.trim()||""
+  if(!base||!key||!/^[a-zA-Z0-9_-]{1,80}$/.test(session))return null
+  let url:URL
+  try {
+    url=new URL(base)
+    if(url.protocol!=="https:" || url.username || url.password)return null
+  }catch{return null}
+  try{
+    const res=await fetch(`${base}/api/sessions/${encodeURIComponent(session)}`,{
+      headers:{"X-Api-Key":key,Accept:"application/json"},
+      cache:"no-store",signal:AbortSignal.timeout(7000),
+    })
+    if(!res.ok)return null
+    const data=await res.json() as {status?:unknown}
+    return typeof data.status==="string"?data.status.toUpperCase():null
+  }catch{return null}
+}
+
 export async function GET() {
   const operator=await operatorFromCookie()
   if(!operator)return forbiddenResponse()
@@ -35,9 +56,10 @@ export async function GET() {
     }))
     const waha=providers.find(c=>c.provider==="waha")
     const readyForPairing=checks.every(c=>c.ok)&&Boolean(waha?.session)
+    const liveStatus=waha?.session?await liveSessionStatus(waha.session):null
     return Response.json({
-      tenantConfigured:true,providers,checks,readyForPairing,
-      connectedVerified:false,
+      tenantConfigured:true,providers,checks,readyForPairing,liveStatus,
+      connectedVerified:liveStatus==="WORKING",
       nextStep:!waha?"register_connection":!checks.every(c=>c.ok)?"configure_server":"verify_session",
       note:"Status salvo no banco não equivale a sessão WORKING. Pareamento e recebimento de mensagem ainda precisam de teste.",
     },{headers:{"Cache-Control":"no-store"}})
