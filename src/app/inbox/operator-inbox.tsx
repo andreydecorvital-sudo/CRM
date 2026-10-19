@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import WorkspaceNavigation from "../workspace-navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, CheckCheck, ChevronLeft, CircleAlert, Inbox, Loader2, LogOut, MessageCircle, RefreshCw, Search, Send, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react"
@@ -155,16 +155,17 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
   }
 
   return <div className="flex min-h-screen flex-col bg-[#f5f7f8] font-sans text-[#17242d]">
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#e6e9ec] bg-white px-4 sm:px-6">
-      <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#183a36] text-white"><MessageCircle size={20}/></span><span><strong className="block text-[14px] tracking-tight">CRM <span className="font-medium text-[#8794a0]">/ Atendimento</span></strong><span className="block text-[10px] text-[#83919b]">Operação interna · Dados do CRM</span></span></div>
-      <div className="flex items-center gap-2 sm:gap-4">{tenants.length>1&&<label className="hidden items-center gap-2 text-[11px] text-[#71818a] sm:flex">Empresa <select aria-label="Empresa ativa" disabled={busy} value={tenants.find(t=>t.selected)?.id||""} onChange={e=>void switchTenant(e.target.value)} className="max-w-36 rounded-lg border border-[#e5e9eb] bg-white px-2 py-2 text-xs text-[#475a65]">{tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}<span className="hidden items-center gap-2 rounded-full bg-[#e9f4eb] px-3 py-1.5 text-[11px] font-semibold text-[#38815e] sm:flex"><span className="size-1.5 rounded-full bg-[#47996c]"/> Acesso autorizado</span><Link href="/settings/whatsapp" className="flex items-center gap-1.5 rounded-lg border border-[#dce7e0] px-2.5 py-2 text-[11px] font-semibold text-[#487761] sm:px-3"><MessageCircle size={14}/> <span className="hidden sm:inline">Configurar WhatsApp</span></Link><button onClick={()=>void reload()} type="button" aria-label="Atualizar conversas" className="rounded-lg p-2 text-[#60737d] hover:bg-[#f3f5f6]"><RefreshCw size={17}/></button><button onClick={()=>void logout()} type="button" className="flex items-center gap-2 rounded-lg border border-[#e5e9eb] px-3 py-2 text-[12px] text-[#596a75] hover:bg-[#f7f9fa]"><LogOut size={14}/><span className="hidden sm:inline">Sair</span></button></div>
-    </header>
+    <WorkspaceNavigation>
+      {tenants.length>1&&<label className="hidden items-center gap-2 text-[11px] text-[#71818a] md:flex">Empresa
+        <select aria-label="Empresa ativa" disabled={busy} value={tenants.find(t=>t.selected)?.id||""} onChange={e=>void switchTenant(e.target.value)} className="max-w-36 rounded-lg border border-[#e5e9eb] bg-white px-2 py-2 text-xs text-[#475a65]">
+          {tenants.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </label>}
+      <button onClick={()=>void reload()} type="button" aria-label="Atualizar conversas" className="rounded-lg p-2 text-[#60737d] hover:bg-[#f3f5f6]"><RefreshCw size={17}/></button>
+      <button onClick={()=>void logout()} type="button" className="flex items-center gap-2 rounded-lg border border-[#e5e9eb] px-3 py-2 text-[12px] text-[#596a75] hover:bg-[#f7f9fa]"><LogOut size={14}/><span className="hidden sm:inline">Sair</span></button>
+    </WorkspaceNavigation>
     <div className="flex min-h-0 flex-1">
-      <aside className="hidden w-[76px] shrink-0 flex-col items-center gap-4 border-r border-[#e6e9ec] bg-white py-6 lg:flex">
-        <span className="grid size-11 place-items-center rounded-xl bg-[#ecf4ee] text-[#246e4e]" title="Atendimento"><Inbox size={21}/></span>
-        <Link href="/crm" title="Funil comercial (em evolução)" className="grid size-11 place-items-center rounded-xl text-[#96a2aa] hover:bg-[#f3f5f6]"><Users size={21}/></Link>
-        <div className="flex-1"/><span className="mb-3 text-[10px] font-semibold text-[#aab3b9]">PILOTO</span>
-      </aside>
+
       <div className="grid min-w-0 flex-1 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)_290px]">
         <aside className={`${mobileThread?"hidden":"flex"} min-w-0 flex-col border-r border-[#e6e9ec] bg-white lg:flex`}>
           <div className="border-b border-[#edf0f2] px-5 pb-4 pt-5"><div className="mb-4 flex items-center justify-between"><h1 className="text-xl font-bold tracking-tight">Conversas</h1><span className="rounded-full bg-[#eef2f0] px-2.5 py-1 text-[11px] font-semibold text-[#71837a]">{list.length}</span></div>
