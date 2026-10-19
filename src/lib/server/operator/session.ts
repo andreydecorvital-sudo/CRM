@@ -80,26 +80,43 @@ export async function operatorFromCookie():Promise<Operator|null>{
   }catch{return null}
 }
 
-export async function signInOperator(email:string,password:string):Promise<boolean>{
-  if(!pilotConfigured()||!email.includes("@")||email.length>320||!password||password.length>1024)return false
-  const res=await operatorAuthRequest("/token?grant_type=password",undefined,{email,password})
-  if(!res.ok)return false
-  const result=await res.json() as {access_token?:string;expires_in?:number;user?:{id?:string}}
-  if(!result.access_token||typeof result.user?.id!=="string"||!UUID.test(result.user.id))return false
-  const token=result.access_token
-  const memberList=await memberships(token,result.user.id)
-  const first=memberList[0]
-  if(first) {
-    const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
-      `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
-    if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return false
+export type SignInResult = {ok:true}|{ok:false;reason:"invalid_credentials"|"email_not_confirmed"|"too_many_attempts"|"auth_unavailable"}
+export async function signInOperator(email:string,password:string):Promise<SignInResult>{
+  if(!pilotConfigured())return {ok:false,reason:"auth_unavailable"}
+  if(!email.includes("@")||email.length>320||!password||password.length>1024)return {ok:false,reason:"invalid_credentials"}
+  let res:Response
+  try{res=await operatorAuthRequest("/token?grant_type=password",undefined,{email,password})}
+  catch{return {ok:false,reason:"auth_unavailable"}}
+  if(!res.ok){
+    const response=await res.json().catch(()=>({})) as {code?:string;error_code?:string;msg?:string;error_description?:string}
+    const code=String(response.code||response.error_code||"").toLowerCase()
+    const message=String(response.msg||response.error_description||"").toLowerCase()
+    if(code==="email_not_confirmed"||message.includes("email not confirmed"))return {ok:false,reason:"email_not_confirmed"}
+    if(res.status===429||code.includes("rate_limit"))return {ok:false,reason:"too_many_attempts"}
+    if(res.status>=500)return {ok:false,reason:"auth_unavailable"}
+    return {ok:false,reason:"invalid_credentials"}
   }
+  const result=await res.json() as {access_token?:string;expires_in?:number;user?:{id?:string}}
+  if(!result.access_token||typeof result.user?.id!=="string"||!UUID.test(result.user.id))
+    return {ok:false,reason:"auth_unavailable"}
+  const token=result.access_token
+  let first:Member|undefined
+  try{
+    // Database provisioning may not be complete, but a valid Auth identity can still
+    // reach the onboarding screen. Never issue a tenant cookie without verified membership.
+    first=(await memberships(token,result.user.id))[0]
+    if(first){
+      const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
+        `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
+      if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))first=undefined
+    }
+  }catch{first=undefined}
   const seconds=Math.max(1,Math.min(3600,Math.floor(result.expires_in||3600)-30))
   const store=await cookies()
   store.set(COOKIE_TOKEN,token,cookieOptions(seconds))
   if(first)store.set(COOKIE_TENANT,first.tenant_id,cookieOptions(seconds))
   else store.delete(COOKIE_TENANT)
-  return true
+  return {ok:true}
 }
 
 export async function listOperatorTenants(operator:Operator){
