@@ -106,6 +106,7 @@ export async function changeConversation(operator:Operator,id:string,action:stri
   return updated
 }
 export async function queueOperatorReply(operator:Operator,id:string,bodyRaw:string,operationId:string,confirmed:boolean) {
+  if(operator.role==="viewer")throw new Error("operator_read_only")
   if(process.env.CRM_OPERATOR_SEND_ENABLED!=="true")throw new Error("outbound_not_enabled")
   if(!confirmed)throw new Error("confirmation_required")
   if(!UUID.test(operationId))throw new Error("invalid_operation_id")
