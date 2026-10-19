@@ -76,13 +76,17 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
   },[])
 
   useEffect(()=>{
-    void reload()
+    const initial=setTimeout(()=>{void reload()},0)
     void fetch("/api/operator/session",{cache:"no-store",credentials:"same-origin"})
       .then(res=>res.json()).then(data=>setSendEnabled(data.sendEnabled===true)).catch(()=>setSendEnabled(false))
     const interval=setInterval(()=>{void reload()},30000)
-    return ()=>clearInterval(interval)
+    return ()=>{clearTimeout(initial);clearInterval(interval)}
   },[reload])
-  useEffect(()=>{if(selected){setThread(null);setDraft("");void loadThread(selected)}else setThread(null)},[selected,loadThread])
+  useEffect(()=>{
+    if(!selected)return
+    const handle=setTimeout(()=>{void loadThread(selected)},0)
+    return ()=>clearTimeout(handle)
+  },[selected,loadThread])
 
   const visible=useMemo(()=>list.filter(item=>{
     if(filter==="unread"&&item.unread<=0)return false
@@ -146,7 +150,7 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
             <div className="flex items-center gap-2 rounded-xl border border-[#e1e6e9] bg-[#fafbfb] px-3 focus-within:border-[#88b79f]"><Search size={17} className="text-[#9aa5ae]"/><input aria-label="Buscar conversas" className="min-w-0 flex-1 bg-transparent py-3 text-[12px] outline-none placeholder:text-[#a0abb2]" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar contato ou assunto..."/>{query&&<button type="button" aria-label="Limpar busca" onClick={()=>setQuery("")}><X size={13}/></button>}</div>
             <div className="mt-4 flex gap-1.5">{([["open","Em aberto"],["unread","Não lidas"],["mine","Minhas"],["all","Todas"]] as const).map(([key,label])=><button key={key} type="button" aria-pressed={filter===key} onClick={()=>setFilter(key)} className={`rounded-lg px-2.5 py-2 text-[10px] font-semibold ${filter===key?"bg-[#1e4c42] text-white":"bg-[#f2f4f5] text-[#71818a] hover:bg-[#e9eeee]"}`}>{label}</button>)}</div>
           </div>
-          <div className="max-h-[calc(100vh-245px)] flex-1 overflow-y-auto">{loading?<p className="flex items-center justify-center gap-2 px-4 py-16 text-xs text-[#84929b]"><Loader2 size={16} className="animate-spin"/> Carregando conversas...</p>:visible.length===0?<div className="px-7 py-16 text-center"><Inbox size={30} className="mx-auto mb-4 text-[#abb9b3]"/><p className="text-[13px] font-semibold">Nenhuma conversa aqui</p><p className="mt-2 text-xs leading-5 text-[#91a0a9]">Os atendimentos recebidos aparecerão após conectar e configurar o WhatsApp da empresa.</p></div>:visible.map(item=><button type="button" key={item.id} onClick={()=>{setSelected(item.id);setMobileThread(true)}} className={`flex w-full gap-3 border-b border-[#f0f2f3] px-5 py-4 text-left transition hover:bg-[#f7faf8] ${selected===item.id?"bg-[#eaf3ed]":"bg-white"}`}>
+          <div className="max-h-[calc(100vh-245px)] flex-1 overflow-y-auto">{loading?<p className="flex items-center justify-center gap-2 px-4 py-16 text-xs text-[#84929b]"><Loader2 size={16} className="animate-spin"/> Carregando conversas...</p>:visible.length===0?<div className="px-7 py-16 text-center"><Inbox size={30} className="mx-auto mb-4 text-[#abb9b3]"/><p className="text-[13px] font-semibold">Nenhuma conversa aqui</p><p className="mt-2 text-xs leading-5 text-[#91a0a9]">Os atendimentos recebidos aparecerão após conectar e configurar o WhatsApp da empresa.</p></div>:visible.map(item=><button type="button" key={item.id} onClick={()=>{setSelected(item.id);setThread(null);setDraft("");setMobileThread(true)}} className={`flex w-full gap-3 border-b border-[#f0f2f3] px-5 py-4 text-left transition hover:bg-[#f7faf8] ${selected===item.id?"bg-[#eaf3ed]":"bg-white"}`}>
               <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#e5ece7] text-xs font-bold text-[#416551]">{item.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</span>
               <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><strong className="truncate text-[12px]">{item.name}</strong><span className="shrink-0 text-[10px] text-[#9aa8ad]">{dateTime(item.lastAt)}</span></span><span className="mt-1 block truncate text-[11px] text-[#80919a]">{item.summary||`${item.channel} · ${displayStatus[item.status]||item.status}`}</span><span className="mt-2 flex items-center gap-1.5"><span className="rounded-md bg-[#edf1f0] px-2 py-1 text-[10px] text-[#668076]">{item.department||item.category||"Triagem"}</span>{item.priority==="high"||item.priority==="urgent"?<span className="rounded-md bg-[#fff0e9] px-2 py-1 text-[10px] text-[#bf7448]">Prioridade</span>:null}{item.unread>0&&<span className="ml-auto grid min-w-5 place-items-center rounded-full bg-[#438565] px-1.5 py-0.5 text-[10px] font-bold text-white">{item.unread}</span>}</span></span>
             </button>)}</div>
