@@ -12,7 +12,7 @@ function configured(key:string){return Boolean(process.env[key]?.trim())}
 
 // Read-only probe. Does not create, start, stop or reconfigure WhatsApp sessions.
 async function liveSessionStatus(session:string):Promise<string|null> {
-  const base=process.env.WAHA_BASE_URL?.trim().replace(/\\/+$/,"")||""
+  const base=process.env.WAHA_BASE_URL?.trim().replace(new RegExp("/+$"),"")||""
   const key=process.env.WAHA_API_KEY?.trim()||""
   if(!base||!key||!/^[a-zA-Z0-9_-]{1,80}$/.test(session))return null
   let url:URL
