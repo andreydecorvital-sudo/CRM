@@ -13,6 +13,7 @@ function configured(key:string){return Boolean(process.env[key]?.trim())}
 export async function GET() {
   const operator=await operatorFromCookie()
   if(!operator)return forbiddenResponse()
+  if(!["owner","admin","manager"].includes(operator.role))return Response.json({error:"forbidden"},{status:403})
   // Only server-side configuration names/states are exposed; never reveal API keys.
   const checks=[
     {key:"WAHA_BASE_URL",label:"Endereço privado do WAHA",ok:configured("WAHA_BASE_URL")},
