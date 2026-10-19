@@ -113,7 +113,7 @@ export async function queueOperatorReply(operator:Operator,id:string,bodyRaw:str
   if(operator.role==="viewer")throw new Error("operator_read_only")
   if(process.env.CRM_OPERATOR_SEND_ENABLED!=="true")throw new Error("outbound_not_enabled")
   if(!confirmed)throw new Error("confirmation_required")
-  if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error("outbound_not_configured")
+  if(!process.env.SUPABASE_SECRET_KEY&&!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error("outbound_not_configured")
   if(!UUID.test(operationId))throw new Error("invalid_operation_id")
   const body=limited(bodyRaw)
   if(!body||body.length>12000||bodyRaw.length>12000)throw new Error("invalid_message")

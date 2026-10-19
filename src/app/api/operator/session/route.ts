@@ -9,7 +9,7 @@ export async function GET() {
       authenticated:Boolean(operator),role:operator?.role??null,
       tenantId:operator?.tenantId??null,tenants,configured:pilotConfigured(),
       sendEnabled:Boolean(operator&&process.env.CRM_OPERATOR_SEND_ENABLED==="true"
-        &&process.env.SUPABASE_SERVICE_ROLE_KEY),
+        &&(process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY)),
     },{headers:{"Cache-Control":"no-store"}})
   }catch{return Response.json({authenticated:false,configured:pilotConfigured()},{headers:{"Cache-Control":"no-store"}})}
 }
