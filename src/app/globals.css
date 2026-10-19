@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
+/* One operational CRM theme. Archived prototype modules set their own dark canvas. */
 :root {
-  color-scheme: dark;
-  --bg: #090b10;
-  --panel: #10131a;
-  --panel-2: #151924;
-  --line: #252b38;
-  --text: #f4f7fb;
-  --muted: #8f9aab;
-  --accent: #7c3aed;
+  color-scheme: light;
+  --bg: #f5f7f8;
+  --panel: #fff;
+  --panel-2: #f1f5f2;
+  --line: #e1e8e3;
+  --text: #20312a;
+  --muted: #7b8e81;
+  --accent: #20584a;
 }
 
 * { box-sizing: border-box; }

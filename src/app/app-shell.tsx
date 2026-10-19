@@ -1,80 +1,25 @@
 "use client"
 
-import Link from "next/link"
-import {
-  BarChart3,
-  Globe2,
-  BriefcaseBusiness,
-  ListTodo,
-  MessageSquareText,
-  PlugZap,
-  Repeat2,
-  Sparkles,
-  Zap,
-  Star,
-  UsersRound,
-  Workflow,
-} from "lucide-react"
 import { usePathname } from "next/navigation"
+import WorkspaceNavigation from "./workspace-navigation"
 
-const nav = [
-  { href: "/inbox", label: "Atendimento", icon: MessageSquareText },
-  { href: "/crm", label: "CRM", icon: UsersRound },
-  { href: "/tasks", label: "Tarefas", icon: ListTodo },
-  { href: "/proposals", label: "Propostas", icon: BriefcaseBusiness },
-  { href: "/customers", label: "Recorrência", icon: Repeat2 },
-  { href: "/reviews", label: "Avaliações", icon: Star },
-  { href: "/sources", label: "Origens", icon: BarChart3 },
-  { href: "/departments", label: "Equipes & Filas", icon: Workflow },
-  { href: "/settings/whatsapp", label: "WhatsApp", icon: PlugZap },
-  { href: "/automations", label: "Automações", icon: Zap },
-  { href: "/integrations", label: "Integrações", icon: Globe2 },
-]
+const liveRoutes=["/inbox","/crm","/settings/whatsapp"]
+export default function AppShell({children}:{children:React.ReactNode}) {
+  const pathname=usePathname()
+  if(pathname==="/"||liveRoutes.some(x=>pathname===x||pathname.startsWith(x+"/")))
+    return <main>{children}</main>
+  if(pathname.startsWith("/review/")||pathname.startsWith("/proposal/"))
+    return <main className="min-h-screen bg-[#090b10] text-[#f4f7fb]">{children}</main>
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-  const publicSurface = pathname.startsWith("/review/") || pathname.startsWith("/proposal/")
-
-  if (publicSurface) {
-    return (
-      <div className="min-h-screen">
-        <header className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-6 text-sm font-semibold text-white/75">
-          <span className="grid size-8 place-items-center rounded-lg bg-violet-600"><Sparkles size={16} /></span>
-          Atendimento
-        </header>
-        <main className="px-5 pb-10">{children}</main>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen md:grid md:grid-cols-[248px_1fr]">
-      <aside className="border-b border-white/10 bg-[#0c0f15] p-5 md:sticky md:top-0 md:h-screen md:border-b-0 md:border-r">
-        <Link href="/" className="mb-7 flex items-center gap-3 text-lg font-semibold">
-          <span className="grid size-9 place-items-center rounded-xl bg-violet-600"><Sparkles size={18} /></span>
-          CRM
-        </Link>
-        <nav className="grid gap-1.5">
-          {nav.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`)
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${active ? "bg-white/8 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
-              >
-                <Icon size={17} /> {label}
-              </Link>
-            )
-          })}
-        </nav>
-        <div className="mt-7 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-white/30">Modo IA</p>
-          <div className="mt-2 flex items-center justify-between"><strong className="text-sm">Assistido</strong><span className="size-2 rounded-full bg-emerald-400" /></div>
-          <p className="mt-2 text-xs leading-5 text-white/40">A IA executa apenas ações liberadas pelas políticas do tenant.</p>
-        </div>
-      </aside>
-      <main className="p-5 md:p-8">{children}</main>
-    </div>
-  )
+  // Older modules are preserved for ongoing development, but never advertised
+  // alongside the real CRM as another usable "system".
+  return <div className="min-h-screen bg-[#f5f7f8] font-sans text-[#20312a]">
+    <WorkspaceNavigation/>
+    <main className="mx-auto max-w-[1600px] space-y-4 px-4 py-6 sm:px-8">
+      <p className="rounded-xl border border-[#eddfbe] bg-[#fffaf0] px-4 py-3 text-xs leading-5 text-[#916b35]" role="status">
+        Módulo em evolução: esta tela é um protótipo e pode conter exemplos. Para dados reais, use Atendimento ou Relacionamento no menu principal.
+      </p>
+      <section className="min-h-[65vh] rounded-3xl bg-[#0d1017] p-4 text-white sm:p-7">{children}</section>
+    </main>
+  </div>
 }
