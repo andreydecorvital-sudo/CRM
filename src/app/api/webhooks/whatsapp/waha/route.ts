@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto"
 import { ingestWhatsappInbound } from "@/lib/server/whatsapp/ingest"
 import { handleWhatsappRegistrationInbound } from "@/lib/server/registration/service"
 import { recordWahaSessionStatus } from "@/lib/server/whatsapp/waha-admin"
+import { supabaseRest } from "@/lib/server/supabase/rest"
+import { crmWahaSession } from "@/lib/server/operator/whatsapp-setup"
 
 function secureEqual(left: string, right: string) {
   const a = Buffer.from(left)
@@ -43,6 +45,15 @@ function objectAt(value: unknown, ...paths: string[][]): Record<string, unknown>
   return null
 }
 
+async function webhookBelongsToTenant(tenantId:string,session:string){
+  let expected:string
+  try{expected=crmWahaSession(tenantId)}catch{return false}
+  if(session!==expected)return false
+  const rows=await supabaseRest<Array<{config:Record<string,unknown>}>>(
+    "GET",`/whatsapp_connections?tenant_id=eq.${encodeURIComponent(tenantId)}&provider=eq.waha&select=config&limit=1`)
+  return rows?.[0]?.config?.session===expected
+}
+
 function phoneFromJid(value: string) {
   const local = value.replace(/@.*$/,"")
   const digits = local.replace(/\D/g,"")
@@ -64,6 +75,15 @@ export async function POST(request: Request) {
   if (!tenantId) return Response.json({ error: "tenant missing" }, { status: 400 })
 
   const eventType = stringAt(event,["event"])
+  const sessionId=stringAt(event,["session"],["payload","session"],["payload","name"])
+  if(!sessionId)return Response.json({error:"missing_session"},{status:400})
+  try{
+    if(!await webhookBelongsToTenant(tenantId,sessionId)){
+      return Response.json({error:"session_tenant_mismatch"},{status:403})
+    }
+  }catch{
+    return Response.json({error:"session_validation_unavailable"},{status:503})
+  }
 
   if (eventType === "session.status") {
     const session = stringAt(event,["payload","name"],["payload","session"],["session"])
@@ -118,7 +138,7 @@ export async function POST(request: Request) {
     metadata: {
       provider: "waha",
       event: eventType || "message",
-      session: stringAt(event,["session"]) || null,
+      session: sessionId,
     },
   })
 
