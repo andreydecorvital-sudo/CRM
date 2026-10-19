@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   try {
     const operator=await operatorFromCookie()
-    return Response.json({authenticated:Boolean(operator),role:operator?.role??null,configured:pilotConfigured()},{
+    return Response.json({authenticated:Boolean(operator),role:operator?.role??null,configured:pilotConfigured(),sendEnabled:Boolean(operator&&process.env.CRM_OPERATOR_SEND_ENABLED==="true")},{
       headers:{"Cache-Control":"no-store"},
     })
   } catch {
