@@ -28,6 +28,38 @@ async function verifiedUser(token:string):Promise<string|null> {
   return typeof user.id==="string"&&UUID.test(user.id)?user.id:null
 }
 
+export type OperatorIdentity = {userId:string;accessToken:string}
+
+export async function authenticatedIdentity():Promise<OperatorIdentity|null> {
+  if(!pilotConfigured())return null
+  const store=await cookies()
+  const accessToken=store.get(COOKIE_TOKEN)?.value||""
+  try{
+    const userId=await verifiedUser(accessToken)
+    return userId?{userId,accessToken}:null
+  }catch{return null}
+}
+
+export async function registerOperator(email:string,password:string):Promise<boolean> {
+  if(!pilotConfigured()||!email.includes("@")||email.length>320||password.length<12||password.length>1024)return false
+  const result=await operatorAuthRequest("/signup",undefined,{email,password})
+  // Supabase may protect user enumeration by returning a placeholder user.
+  // Never infer email ownership from returned account metadata.
+  return result.ok
+}
+
+export async function createFirstWorkspace(identity:OperatorIdentity,name:string):Promise<boolean> {
+  const trimmed=name.trim()
+  if(trimmed.length<2||trimmed.length>100)return false
+  const result=await operatorRest<string>(identity.accessToken,"POST","/rpc/crm_create_first_workspace",{p_name:trimmed})
+  if(typeof result!=="string"||!UUID.test(result))throw new Error("workspace_create_unavailable")
+  const memberList=await memberships(identity.accessToken,identity.userId)
+  if(!memberList.some(m=>m.tenant_id===result&&m.role==="owner"))throw new Error("workspace_membership_not_verified")
+  const store=await cookies()
+  store.set(COOKIE_TENANT,result,cookieOptions(1800))
+  return true
+}
+
 export async function operatorFromCookie():Promise<Operator|null>{
   if(!pilotConfigured())return null
   const store=await cookies()
@@ -57,14 +89,16 @@ export async function signInOperator(email:string,password:string):Promise<boole
   const token=result.access_token
   const memberList=await memberships(token,result.user.id)
   const first=memberList[0]
-  if(!first)return false
-  const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
-    `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
-  if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return false
+  if(first) {
+    const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
+      `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
+    if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return false
+  }
   const seconds=Math.max(1,Math.min(3600,Math.floor(result.expires_in||3600)-30))
   const store=await cookies()
   store.set(COOKIE_TOKEN,token,cookieOptions(seconds))
-  store.set(COOKIE_TENANT,first.tenant_id,cookieOptions(seconds))
+  if(first)store.set(COOKIE_TENANT,first.tenant_id,cookieOptions(seconds))
+  else store.delete(COOKIE_TENANT)
   return true
 }
 
