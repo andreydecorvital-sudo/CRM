@@ -3,7 +3,16 @@ type Method = "GET" | "POST" | "PATCH" | "DELETE"
 function config() {
   const url = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "")
   const key = String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "")
-  if (!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(url) || !key) throw new Error("Supabase não configurado no servidor.")
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+    const labels = parsed.hostname.split(".")
+    if (parsed.protocol !== "https:" || labels.length !== 3 || labels[1] !== "supabase" ||
+        labels[2] !== "co" || !/^[a-z0-9-]+$/i.test(labels[0]) ||
+        parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.port ||
+        parsed.username || parsed.password) throw new Error("invalid_supabase_host")
+  } catch { throw new Error("Supabase não configurado no servidor.") }
+  if (!key) throw new Error("Supabase não configurado no servidor.")
   if (key.startsWith("sb_") && !key.startsWith("sb_secret_")) throw new Error("Chave Supabase de servidor inválida.")
   return { url, key, modern: key.startsWith("sb_secret_") }
 }
