@@ -35,7 +35,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const publicSurface = pathname.startsWith("/review/") || pathname.startsWith("/proposal/")
 
-  if (pathname.startsWith("/inbox")) return <main>{children}</main>
+  if (pathname.startsWith("/inbox") || pathname.startsWith("/settings/whatsapp")) return <main>{children}</main>
 
   if (publicSurface) {
     return (
