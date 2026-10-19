@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { cookies } from "next/headers"
-import { supabaseRest } from "@/lib/server/supabase/rest"
+import { supabaseRest } from "../supabase/rest"
 
 const COOKIE_NAME = "crm_internal_pilot"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
