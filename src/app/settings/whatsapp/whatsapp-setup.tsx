@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircle, ArrowLeft, CheckCircle2, CircleDashed, ExternalLink, Link2, MessageSquare, RefreshCw, Server, ShieldCheck, Smartphone, WifiOff } from "lucide-react"
 
@@ -15,6 +16,10 @@ export default function WhatsappSetup() {
   const [state,setState]=useState<Diagnostics|null>(null)
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState("")
+  const [working,setWorking]=useState(false)
+  const [qr,setQr]=useState<string|null>(null)
+  const [pairStatus,setPairStatus]=useState<string|null>(null)
+  const [notice,setNotice]=useState("")
   const reload=useCallback(async()=>{
     setLoading(true)
     try{
@@ -30,6 +35,49 @@ export default function WhatsappSetup() {
     const handle=setTimeout(()=>{void reload()},0)
     return ()=>clearTimeout(handle)
   },[reload])
+  async function prepare(){
+    setWorking(true);setError("");setNotice("")
+    try {
+      const res=await fetch("/api/operator/whatsapp",{
+        method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"prepare"}),
+      })
+      if(!res.ok)throw new Error("connection_prepare_failed")
+      setNotice("Canal exclusivo da empresa registrado. Próxima etapa: preparar a sessão WAHA.")
+      await reload()
+    }catch{setError("Não foi possível cadastrar o canal. O administrador precisa ativar a migration de registro no Supabase do CRM.")}
+    finally{setWorking(false)}
+  }
+  async function startPairing(){
+    if(!window.confirm("Criar uma sessão exclusiva no provedor WAHA configurado para o CRM? Nenhuma sessão existente será alterada."))return
+    setWorking(true);setError("");setNotice("")
+    try{
+      const r=await fetch("/api/operator/whatsapp/pairing",{
+        method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"start",confirmed:true}),
+      })
+      const data=await r.json() as {error?:string;status?:string}
+      if(!r.ok)throw new Error(data.error||"pairing_unavailable")
+      setPairStatus(data.status||"STARTING")
+      setNotice("Sessão preparada. Quando aparecer SCAN_QR_CODE, clique em Exibir QR.")
+    }catch(e){setError(e instanceof Error&&e.message==="waha_dedicated_instance_required"?
+      "Configure uma instância WAHA exclusiva do CRM. A sessão do Argoplace está protegida.":
+      "Ainda faltam as credenciais, o webhook ou a instância WAHA dedicada. Nenhum número foi conectado.")}
+    finally{setWorking(false)}
+  }
+  async function fetchQr(){
+    setWorking(true);setError("")
+    try{
+      const r=await fetch("/api/operator/whatsapp/pairing",{credentials:"same-origin",cache:"no-store"})
+      const data=await r.json() as {error?:string;status?:string;qr?:string|null;connected?:boolean}
+      if(!r.ok)throw new Error(data.error||"qr_unavailable")
+      setPairStatus(data.status||null)
+      setQr(data.qr||null)
+      if(data.connected)setNotice("WAHA confirmou a sessão WORKING. Verifique o recebimento antes de liberar envios.")
+      else if(!data.qr)setNotice("A sessão ainda não gerou QR. Atualize novamente após o início.")
+    }catch{setError("QR indisponível. Confira se a sessão exclusiva foi iniciada e se o WAHA está acessível.")}
+    finally{setWorking(false)}
+  }
   const wa=state?.providers.find(p=>p.provider==="waha")
   const checks=state?.checks||[]
   const allConfigured=checks.length>0&&checks.every(c=>c.ok)
@@ -55,6 +103,22 @@ export default function WhatsappSetup() {
           <div className="rounded-xl bg-[#f7f9f8] p-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-[#93a09d]">Número</span><strong className="mt-2 block text-sm">{wa?.phone||"Aguardando autenticação"}</strong></div>
         </div>
         {wa?.status==="connected"&&!state?.connectedVerified&&<p className="mt-4 flex items-center gap-2 rounded-xl bg-[#fff6e9] px-4 py-3 text-xs text-[#977245]"><AlertCircle size={16}/> O registro do banco indica conectado, mas isso não confirma que a sessão WAHA esteja WORKING agora.</p>}
+      </section>
+      <section className="rounded-2xl border border-[#dee9e1] bg-white p-6 shadow-sm">
+        <div className="mb-4"><h2 className="text-[15px] font-bold">Ativação assistida</h2><p className="mt-2 text-[12px] leading-5 text-[#81918a]">Registre a conexão, prepare a sessão do CRM e faça o pareamento por QR. O número só entra no sistema depois do escaneamento.</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!wa&&<button type="button" disabled={working||loading} onClick={()=>void prepare()} className="rounded-xl bg-[#255748] px-4 py-3 text-xs font-semibold text-white disabled:opacity-50">1. Registrar canal da empresa</button>}
+          {wa&&<button type="button" disabled={working||loading} onClick={()=>void startPairing()} className="rounded-xl bg-[#255748] px-4 py-3 text-xs font-semibold text-white disabled:opacity-50">2. Preparar sessão WAHA</button>}
+          {wa&&<button type="button" disabled={working||loading} onClick={()=>void fetchQr()} className="rounded-xl border border-[#cddfd4] bg-white px-4 py-3 text-xs font-semibold text-[#285743] disabled:opacity-50">3. Exibir ou atualizar QR</button>}
+          {working&&<span role="status" className="text-xs text-[#76897e]">Consultando o provedor...</span>}
+        </div>
+        {notice&&<p role="status" className="mt-3 rounded-xl bg-[#eaf5ef] p-3 text-xs text-[#32674d]">{notice}</p>}
+        {pairStatus&&<p className="mt-3 text-xs text-[#657c6d]">Status de pareamento: <strong>{pairStatus}</strong></p>}
+        {qr&&<div className="mt-5 inline-flex flex-col items-center rounded-xl border border-[#e0e8e1] bg-white p-5">
+          <Image unoptimized src={qr} width={240} height={240} alt="QR temporário para vincular o WhatsApp autorizado ao CRM" className="rounded-lg"/>
+          <p className="mt-3 max-w-64 text-center text-[11px] leading-5 text-[#647a6c]">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho. Atualize o QR se expirar.</p>
+        </div>}
+        <p className="mt-4 text-[11px] text-[#80918a]">A instância WAHA deve ser dedicada ao CRM. Esta tela não reutiliza, reinicia ou desconecta a sessão do Argoplace.</p>
       </section>
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="rounded-2xl border border-[#e1e8e6] bg-white p-6 shadow-sm"><div className="mb-5 flex items-center gap-3"><Server size={19} className="text-[#4e8870]"/><h2 className="text-[15px] font-semibold">Infraestrutura necessária</h2></div>
