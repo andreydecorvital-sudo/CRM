@@ -8,7 +8,7 @@ type Check={key:string;label:string;ok:boolean}
 type Provider={provider:string;status:string;phone:string|null;session:string|null}
 type Diagnostics={
   error?:string;checks:Check[];providers:Provider[];readyForPairing:boolean;connectedVerified:boolean;
-  nextStep?:string;note?:string
+  nextStep?:string;note?:string;liveStatus?:string|null
 }
 
 export default function WhatsappSetup() {
@@ -33,7 +33,7 @@ export default function WhatsappSetup() {
   const wa=state?.providers.find(p=>p.provider==="waha")
   const checks=state?.checks||[]
   const allConfigured=checks.length>0&&checks.every(c=>c.ok)
-  const status=wa?.status==="connected"?"Conexão cadastrada como conectada":
+  const status=state?.connectedVerified?"Sessão WAHA verificada como WORKING":wa?.status==="connected"?"Conexão cadastrada como conectada":
     wa?"Conexão cadastrada — aguardando pareamento":"Nenhuma conexão desta empresa cadastrada"
   const reached=allConfigured&&wa?.session
 
@@ -54,12 +54,13 @@ export default function WhatsappSetup() {
           <div className="rounded-xl bg-[#f7f9f8] p-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-[#93a09d]">Sessão</span><strong className="mt-2 block break-all text-sm">{wa?.session||"Não definida"}</strong></div>
           <div className="rounded-xl bg-[#f7f9f8] p-4"><span className="text-[10px] font-semibold uppercase tracking-wider text-[#93a09d]">Número</span><strong className="mt-2 block text-sm">{wa?.phone||"Aguardando autenticação"}</strong></div>
         </div>
-        {wa?.status==="connected"&&<p className="mt-4 flex items-center gap-2 rounded-xl bg-[#fff6e9] px-4 py-3 text-xs text-[#977245]"><AlertCircle size={16}/> O registro do banco indica conectado, mas isso não confirma que a sessão WAHA esteja WORKING agora.</p>}
+        {wa?.status==="connected"&&!state?.connectedVerified&&<p className="mt-4 flex items-center gap-2 rounded-xl bg-[#fff6e9] px-4 py-3 text-xs text-[#977245]"><AlertCircle size={16}/> O registro do banco indica conectado, mas isso não confirma que a sessão WAHA esteja WORKING agora.</p>}
       </section>
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="rounded-2xl border border-[#e1e8e6] bg-white p-6 shadow-sm"><div className="mb-5 flex items-center gap-3"><Server size={19} className="text-[#4e8870]"/><h2 className="text-[15px] font-semibold">Infraestrutura necessária</h2></div>
           <div className="space-y-2">{checks.map(item=><div key={item.key} className="flex items-center justify-between gap-3 rounded-xl border border-[#edf0ed] px-4 py-3"><div><p className="text-xs font-semibold">{item.label}</p><code className="mt-1 block break-all text-[10px] text-[#9aa6a5]">{item.key}</code></div><span className={`flex shrink-0 items-center gap-1 text-[11px] font-semibold ${item.ok?"text-[#45886a]":"text-[#b18557]"}`}>{item.ok?<CheckCircle2 size={15}/>:<CircleDashed size={15}/>} {item.ok?"Definida":"Pendente"}</span></div>)}
           {loading&&!state&&<p className="text-xs text-[#8b999a]">Verificando variáveis do ambiente...</p>}</div>
+          {state?.liveStatus&&<p className="mt-3 rounded-xl bg-[#f3f7f4] p-3 text-xs text-[#62836d]">Estado remoto WAHA: <strong>{state.liveStatus}</strong></p>}
           <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#81908a]"><ShieldCheck size={17} className="shrink-0 text-[#648a73]"/> Chaves e senhas permanecem exclusivamente no servidor; esta tela mostra apenas se estão presentes.</p>
         </section>
         <section className="rounded-2xl border border-[#e1e8e6] bg-white p-6 shadow-sm"><div className="mb-5 flex items-center gap-3"><Link2 size={19} className="text-[#4e8870]"/><h2 className="text-[15px] font-semibold">Etapas para ativar</h2></div>
@@ -67,7 +68,7 @@ export default function WhatsappSetup() {
             {[
               {title:"Preparar instância WAHA",detail:"Usar uma instância autorizada para o CRM, sem substituir a sessão do Argoplace.",done:allConfigured},
               {title:"Vincular a empresa",detail:"Cadastrar o canal WhatsApp no tenant correto e definir uma sessão exclusiva.",done:Boolean(wa?.session)},
-              {title:"Parear o telefone",detail:"Escanear o QR oficial do WAHA com o aparelho que usará este CRM.",done:false},
+              {title:"Parear o telefone",detail:"Escanear o QR oficial do WAHA com o aparelho que usará este CRM.",done:state?.connectedVerified===true},
               {title:"Validar recebimento",detail:"Confirmar webhook e uma mensagem de teste com consentimento, antes de liberar respostas.",done:false},
             ].map((step,i)=><li className="flex gap-3" key={step.title}><span className={`grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${step.done?"bg-[#e0f3e9] text-[#327d59]":"bg-[#eef1ef] text-[#8a9b90]"}`}>{step.done?<CheckCircle2 size={16}/>:i+1}</span><div><h3 className="text-xs font-semibold">{step.title}</h3><p className="mt-1 text-[11px] leading-5 text-[#83938e]">{step.detail}</p></div></li>)}
           </ol>
