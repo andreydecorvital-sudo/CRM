@@ -9,7 +9,7 @@ export default function AppShell({children}:{children:React.ReactNode}) {
   if(pathname==="/"||liveRoutes.some(x=>pathname===x||pathname.startsWith(x+"/")))
     return <main>{children}</main>
   if(pathname.startsWith("/review/")||pathname.startsWith("/proposal/"))
-    return <main>{children}</main>
+    return <main className="min-h-screen bg-[#090b10] text-[#f4f7fb]">{children}</main>
 
   // Older modules are preserved for ongoing development, but never advertised
   // alongside the real CRM as another usable "system".
