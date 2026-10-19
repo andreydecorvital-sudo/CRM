@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { supabaseRest } from "../supabase/rest"
+import { operatorRest } from "./auth-rest"
 import type { Operator } from "./session"
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -23,16 +24,18 @@ export type InboxConversation={
 }
 export type InboxThread={conversation:InboxConversation;messages:MessageRow[];outbound:Array<{id:string;body:string;status:string;created_at:string}>}
 
-async function contactMap(tenant:string,ids:string[]) {
+async function contactMap(operator:Operator,ids:string[]) {
+  const tenant=operator.tenantId
   const unique=[...new Set(ids.filter(x=>UUID.test(x)))]
   if(!unique.length)return new Map<string,ContactRow>()
-  const rows=await supabaseRest<ContactRow[]>("GET",`/contacts?tenant_id=eq.${tenant}&id=in.(${unique.join(",")})&select=id,display_name,phone_e164,email,city,temperature&limit=100`)
+  const rows=await operatorRest<ContactRow[]>(operator.accessToken,"GET",`/contacts?tenant_id=eq.${tenant}&id=in.(${unique.join(",")})&select=id,display_name,phone_e164,email,city,temperature&limit=100`)
   return new Map((rows||[]).map(c=>[c.id,c]))
 }
-async function departmentMap(tenant:string,ids:string[]) {
+async function departmentMap(operator:Operator,ids:string[]) {
+  const tenant=operator.tenantId
   const unique=[...new Set(ids.filter(x=>UUID.test(x)))]
   if(!unique.length)return new Map<string,DepartmentRow>()
-  const rows=await supabaseRest<DepartmentRow[]>("GET",`/departments?tenant_id=eq.${tenant}&id=in.(${unique.join(",")})&select=id,name&limit=100`)
+  const rows=await operatorRest<DepartmentRow[]>(operator.accessToken,"GET",`/departments?tenant_id=eq.${tenant}&id=in.(${unique.join(",")})&select=id,name&limit=100`)
   return new Map((rows||[]).map(d=>[d.id,d]))
 }
 function view(row:ConversationRow,contact?:ContactRow,dept?:DepartmentRow):InboxConversation {
@@ -46,25 +49,26 @@ function view(row:ConversationRow,contact?:ContactRow,dept?:DepartmentRow):Inbox
   }
 }
 
-async function getRow(tenant:string,id:string) {
+async function getRow(operator:Operator,id:string) {
+  const tenant=operator.tenantId
   if(!UUID.test(id))return null
-  const rows=await supabaseRest<ConversationRow[]>("GET",
+  const rows=await operatorRest<ConversationRow[]>(operator.accessToken,"GET",
     `/conversations?tenant_id=eq.${tenant}&id=eq.${id}&select=id,tenant_id,contact_id,channel,status,category,priority,ai_mode,summary,unread_count,assigned_to,department_id,last_message_at,last_inbound_at,last_outbound_at&limit=1`)
   return rows?.[0]||null
 }
 export async function listInbox(operator:Operator) {
   const tenant=operator.tenantId
-  const rows=await supabaseRest<ConversationRow[]>("GET",
+  const rows=await operatorRest<ConversationRow[]>(operator.accessToken,"GET",
     `/conversations?tenant_id=eq.${tenant}&select=id,tenant_id,contact_id,channel,status,category,priority,ai_mode,summary,unread_count,assigned_to,department_id,last_message_at,last_inbound_at,last_outbound_at&order=last_message_at.desc.nullslast&limit=80`)
-  const [contacts,depts]=await Promise.all([contactMap(tenant,rows.map(x=>x.contact_id)),departmentMap(tenant,rows.map(x=>x.department_id||""))])
+  const [contacts,depts]=await Promise.all([contactMap(operator,rows.map(x=>x.contact_id)),departmentMap(operator,rows.map(x=>x.department_id||""))])
   return rows.map(row=>view(row,contacts.get(row.contact_id),depts.get(row.department_id||"")))
 }
 export async function readThread(operator:Operator,id:string):Promise<InboxThread|null> {
-  const row=await getRow(operator.tenantId,id)
+  const row=await getRow(operator,id)
   if(!row)return null
   const tenant=operator.tenantId
   const [contacts,depts,messages,outbound]=await Promise.all([
-    contactMap(tenant,[row.contact_id]),departmentMap(tenant,[row.department_id||""]),
+    contactMap(operator,[row.contact_id]),departmentMap(operator,[row.department_id||""]),
     supabaseRest<MessageRow[]>("GET",`/messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&select=id,direction,actor,text,status,created_at,sent_at&order=created_at.desc&limit=150`),
     supabaseRest<Array<{id:string;body:string;status:string;created_at:string}>>("GET",`/outbound_messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&status=in.(pending,queued,sending,failed,suppressed)&select=id,body,status,created_at&order=created_at.desc&limit=20`),
   ])
@@ -72,7 +76,7 @@ export async function readThread(operator:Operator,id:string):Promise<InboxThrea
 }
 export async function changeConversation(operator:Operator,id:string,action:string) {
   if(operator.role==="viewer")throw new Error("operator_read_only")
-  const row=await getRow(operator.tenantId,id)
+  const row=await getRow(operator,id)
   if(!row)throw new Error("conversation_not_found")
   const own= row.assigned_to === operator.userId
   const manager=["owner","admin","manager"].includes(operator.role)
@@ -93,8 +97,8 @@ export async function changeConversation(operator:Operator,id:string,action:stri
   }else if(action==="mark_read"){
     change={unread_count:0,updated_at:now}
   }else throw new Error("unknown_action")
-  await supabaseRest("PATCH",`/conversations?tenant_id=eq.${operator.tenantId}&id=eq.${id}`,change)
-  const updated=await getRow(operator.tenantId,id)
+  await operatorRest(operator.accessToken,"PATCH",`/conversations?tenant_id=eq.${operator.tenantId}&id=eq.${id}`,change)
+  const updated=await getRow(operator,id)
   if(!updated)throw new Error("post_write_verification_failed")
   for(const [key,value] of Object.entries(change)) {
     if (key==="updated_at")continue
@@ -108,11 +112,12 @@ export async function changeConversation(operator:Operator,id:string,action:stri
 export async function queueOperatorReply(operator:Operator,id:string,bodyRaw:string,operationId:string,confirmed:boolean) {
   if(operator.role==="viewer")throw new Error("operator_read_only")
   if(process.env.CRM_OPERATOR_SEND_ENABLED!=="true")throw new Error("outbound_not_enabled")
+  if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error("outbound_not_configured")
   if(!confirmed)throw new Error("confirmation_required")
   if(!UUID.test(operationId))throw new Error("invalid_operation_id")
   const body=limited(bodyRaw)
   if(!body||body.length>12000||bodyRaw.length>12000)throw new Error("invalid_message")
-  const row=await getRow(operator.tenantId,id)
+  const row=await getRow(operator,id)
   if(!row)throw new Error("conversation_not_found")
   if(row.status==="resolved"||row.channel!=="whatsapp")throw new Error("conversation_unavailable")
   if(row.assigned_to!==operator.userId)throw new Error("claim_before_sending")
