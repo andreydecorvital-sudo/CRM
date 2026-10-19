@@ -1,31 +1,83 @@
-# Shared AI Gateway example.
-# Do not commit provider keys. Keep this service separate from the CRM runtime.
+# Shared inference gateway — STAGING TEMPLATE, not yet deployed.
+# Never put provider keys in the CRM/Argoplace/Orquestra code or frontend.
+# Configure a dedicated PostgreSQL database, per-app LiteLLM virtual keys,
+# per-key budgets and provider credentials before serving any inference.
 #
-# Current LiteLLM docs expose OpenAI-compatible endpoints such as:
-# /v1/chat/completions and /v1/responses.
-#
-# Replace upstream models according to provider availability before production.
-
+# The provider model IDs are EXAMPLES verified against LiteLLM docs in Oct 2026;
+# verify real availability on the provider account before enabling billing.
 model_list:
-  - model_name: crm-default
-    litellm_params:
-      model: gemini/gemini-2.5-pro
-      api_key: os.environ/GEMINI_API_KEY
-
-  - model_name: crm-fast
+  # Five provider choices, individually routable.
+  - model_name: provider-gemini
     litellm_params:
       model: gemini/gemini-2.5-flash
       api_key: os.environ/GEMINI_API_KEY
+    rpm: 60
+  - model_name: provider-openai
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+    rpm: 60
+  - model_name: provider-claude
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    rpm: 30
+  - model_name: provider-groq
+    litellm_params:
+      model: groq/openai/gpt-oss-20b
+      api_key: os.environ/GROQ_API_KEY
+    rpm: 60
+  - model_name: provider-grok
+    litellm_params:
+      model: xai/grok-4.3
+      api_key: os.environ/XAI_API_KEY
+    rpm: 30
+
+  # Stable semantic aliases used by products — never provider-specific IDs.
+  - model_name: crm-default
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: crm-fast
+    litellm_params:
+      model: groq/openai/gpt-oss-20b
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: mira-consultive
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: mira-fast
+    litellm_params:
+      model: groq/openai/gpt-oss-20b
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: argoplace-analyst
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: orquestra-research
+    litellm_params:
+      model: xai/grok-4.3
+      api_key: os.environ/XAI_API_KEY
 
 router_settings:
+  routing_strategy: simple-shuffle
   fallbacks:
-    - crm-default:
-        - crm-fast
+    - crm-default: [provider-openai, provider-groq]
+    - crm-fast: [provider-gemini]
+    - mira-consultive: [provider-gemini]
+    - mira-fast: [provider-gemini]
+    - argoplace-analyst: [provider-gemini, provider-claude]
+    - orquestra-research: [provider-gemini]
+  num_retries: 0
+  allowed_fails: 2
+  cooldown_time: 30
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   database_url: os.environ/DATABASE_URL
+  enforce_fallback_model_access: true
 
 litellm_settings:
-  request_timeout: 45
-  num_retries: 2
+  request_timeout: 25
+  num_retries: 0
+  drop_params: true
