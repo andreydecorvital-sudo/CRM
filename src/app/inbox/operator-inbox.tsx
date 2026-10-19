@@ -1,7 +1,7 @@
 "use client"
 
 import WorkspaceNavigation from "../workspace-navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, CheckCheck, ChevronLeft, CircleAlert, Inbox, Loader2, LogOut, MessageCircle, RefreshCw, Search, Send, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react"
 
@@ -14,10 +14,11 @@ type Message={id:string;direction:"inbound"|"outbound";actor:string;text:string;
 type Thread={conversation:Conversation;messages:Message[];outbound:Array<{id:string;body:string;status:string;created_at:string}>}
 type Filter="all"|"unread"|"mine"|"open"
 
+const dateFormatter=new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})
 function dateTime(value:string|null) {
   if(!value)return "—"
   const date=new Date(value)
-  return Number.isNaN(date.getTime())?"—":new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(date)
+  return Number.isNaN(date.getTime())?"—":dateFormatter.format(date)
 }
 const displayStatus:Record<string,string>={
  open:"Aberto",waiting_team:"Aguardando equipe",waiting_contact:"Aguardando cliente",resolved:"Resolvido"
@@ -55,8 +56,13 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
   const [pendingReplyId,setPendingReplyId]=useState<string|null>(null)
   const [detailOpen,setDetailOpen]=useState(true)
   const [mobileThread,setMobileThread]=useState(false)
+  const listInFlight=useRef(false)
+  const latestThreadRequest=useRef(0)
   
   const reload=useCallback(async()=>{
+    // A slow server must never accumulate concurrent polls of the same Inbox.
+    if(listInFlight.current)return
+    listInFlight.current=true
     try {
       const res=await fetch("/api/operator/inbox",{credentials:"same-origin",cache:"no-store"})
       if(!res.ok)throw new Error("inbox_unavailable")
@@ -66,15 +72,22 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
       setSelected(previous=>previous&&conversations.some(x=>x.id===previous)?previous:conversations[0]?.id??null)
       setError("")
     }catch(e){setError(errorTranslation[e instanceof Error?e.message:""]||"Falha na leitura das conversas.")}
-    finally{setLoading(false)}
+    finally{listInFlight.current=false;setLoading(false)}
   },[])
   const loadThread=useCallback(async(id:string)=>{
+    const request=++latestThreadRequest.current
     try{
       const res=await fetch(`/api/operator/inbox/${id}`,{credentials:"same-origin",cache:"no-store"})
       if(!res.ok)throw new Error("thread_unavailable")
-      setThread(await res.json() as Thread)
+      const result=await res.json() as Thread
+      // Ignore a slow response for a thread the user has already left.
+      if(request!==latestThreadRequest.current)return
+      setThread(result)
       setError("")
-    }catch{setThread(null);setError("Não foi possível consultar o histórico desta conversa.")}
+    }catch{
+      if(request!==latestThreadRequest.current)return
+      setThread(null);setError("Não foi possível consultar o histórico desta conversa.")
+    }
   },[])
 
   useEffect(()=>{
@@ -84,13 +97,22 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
         setSendEnabled(data.sendEnabled===true)
         setTenants(Array.isArray(data.tenants)?data.tenants:[])
       }).catch(()=>setSendEnabled(false))
-    const interval=setInterval(()=>{void reload()},30000)
-    return ()=>{clearTimeout(initial);clearInterval(interval)}
+    const interval=setInterval(()=>{
+      if(document.visibilityState==="visible")void reload()
+    },45000)
+    const onVisible=()=>{
+      if(document.visibilityState==="visible")void reload()
+    }
+    document.addEventListener("visibilitychange",onVisible)
+    return ()=>{
+      clearTimeout(initial);clearInterval(interval)
+      document.removeEventListener("visibilitychange",onVisible)
+    }
   },[reload])
   useEffect(()=>{
-    if(!selected)return
+    if(!selected){latestThreadRequest.current+=1;return}
     const handle=setTimeout(()=>{void loadThread(selected)},0)
-    return ()=>clearTimeout(handle)
+    return ()=>{clearTimeout(handle);latestThreadRequest.current+=1}
   },[selected,loadThread])
 
   const visible=useMemo(()=>list.filter(item=>{
@@ -100,7 +122,9 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
     const search=query.toLocaleLowerCase("pt-BR").trim()
     return !search || [item.name,item.phone,item.summary,item.department].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR").includes(search)
   }),[list,filter,query,operatorId])
-  const selectedConversation=thread?.conversation || list.find(x=>x.id===selected) || null
+  // Keep stale network results out of the UI without a synchronous state update in effects.
+  const currentThread=thread?.conversation.id===selected?thread:null
+  const selectedConversation=currentThread?.conversation || list.find(x=>x.id===selected) || null
   const myConversation=selectedConversation?.assignedTo===operatorId
   const canReply=Boolean(sendEnabled&&myConversation&&selectedConversation?.status!=="resolved"&&selectedConversation?.aiMode==="off"&&draft.trim())
 
@@ -176,13 +200,13 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
               <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#e5ece7] text-xs font-bold text-[#416551]">{item.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</span>
               <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><strong className="truncate text-[12px]">{item.name}</strong><span className="shrink-0 text-[10px] text-[#9aa8ad]">{dateTime(item.lastAt)}</span></span><span className="mt-1 block truncate text-[11px] text-[#80919a]">{item.summary||`${item.channel} · ${displayStatus[item.status]||item.status}`}</span><span className="mt-2 flex items-center gap-1.5"><span className="rounded-md bg-[#edf1f0] px-2 py-1 text-[10px] text-[#668076]">{item.department||item.category||"Triagem"}</span>{item.priority==="high"||item.priority==="urgent"?<span className="rounded-md bg-[#fff0e9] px-2 py-1 text-[10px] text-[#bf7448]">Prioridade</span>:null}{item.unread>0&&<span className="ml-auto grid min-w-5 place-items-center rounded-full bg-[#438565] px-1.5 py-0.5 text-[10px] font-bold text-white">{item.unread}</span>}</span></span>
             </button>)}</div>
-          <div className="mt-auto border-t border-[#edf0f2] px-5 py-4 text-[11px] text-[#99a6ad]">Atualização automática a cada 30 s</div>
+          <div className="mt-auto border-t border-[#edf0f2] px-5 py-4 text-[11px] text-[#99a6ad]">Atualização automática a cada 45 s, somente com a tela aberta</div>
         </aside>
         <section className={`${mobileThread?"flex":"hidden"} min-h-[650px] min-w-0 flex-col bg-[#f7f9f9] lg:flex`}>
           {!selectedConversation?<div className="grid flex-1 place-items-center px-7 text-center"><div><MessageCircle className="mx-auto mb-4 text-[#b2c0b8]" size={38}/><h2 className="font-semibold">Selecione uma conversa</h2><p className="mt-2 text-xs text-[#8a9aa2]">Mensagens reais aparecerão aqui, sem dados fictícios.</p></div></div>:<>
             <div className="flex items-center justify-between gap-2 border-b border-[#e5e9e9] bg-white px-4 py-3 sm:px-6"><div className="flex min-w-0 items-center gap-3"><button type="button" onClick={()=>setMobileThread(false)} className="p-1 text-[#6e8085] lg:hidden" aria-label="Voltar à lista"><ChevronLeft size={19}/></button><span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#e5ece7] font-semibold text-[#416551]"><Users size={18}/></span><span className="min-w-0"><strong className="block truncate text-[13px]">{selectedConversation.name}</strong><span className="block truncate text-[11px] text-[#88979d]">{selectedConversation.phone||"Sem telefone"} · {displayStatus[selectedConversation.status]||selectedConversation.status}</span></span></div><button type="button" className="rounded-lg border border-[#e1e8e6] p-2 text-[#6f8478] 2xl:hidden" aria-label="Alternar detalhes" aria-pressed={detailOpen} onClick={()=>setDetailOpen(!detailOpen)}><Users size={17}/></button></div>
             <div className="flex flex-wrap items-center gap-2 border-b border-[#e7ece9] bg-[#fcfdfc] px-4 py-3 sm:px-6">{!myConversation&&<button disabled={busy} onClick={()=>void action("claim")} className="flex items-center gap-1.5 rounded-lg bg-[#20584a] px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-50"><UserRoundCheck size={14}/> Assumir atendimento</button>}{myConversation&&<button disabled={busy} onClick={()=>void action("release")} className="flex items-center gap-1.5 rounded-lg border border-[#dce5e0] px-3 py-2 text-[11px] font-semibold text-[#537361]"><UserRoundX size={14}/> Liberar</button>}{selectedConversation.status==="resolved"?<button disabled={busy} onClick={()=>void action("reopen")} className="rounded-lg border border-[#dce5e0] px-3 py-2 text-[11px] font-semibold text-[#537361]">Reabrir</button>:<button disabled={busy} onClick={()=>void action("resolve")} className="flex items-center gap-1.5 rounded-lg border border-[#dce5e0] px-3 py-2 text-[11px] font-semibold text-[#537361]"><Check size={14}/> Resolver</button>} {selectedConversation.unread>0&&<button disabled={busy} onClick={()=>void action("mark_read")} className="flex items-center gap-1.5 rounded-lg border border-[#dce5e0] px-3 py-2 text-[11px] font-semibold text-[#537361]"><CheckCheck size={14}/> Marcar lido</button>}</div>
-            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-7 sm:px-8"><div className="mb-6 text-center"><span className="rounded-full bg-white px-3 py-1.5 text-[10px] text-[#87999a]">Histórico do CRM</span></div>{thread===null?<p className="flex items-center justify-center gap-2 py-10 text-xs text-[#8d9b9b]"><Loader2 size={15} className="animate-spin"/> Consultando mensagens...</p>:thread.messages.length===0?<p className="py-10 text-center text-xs text-[#95a4a4]">Sem mensagens registradas para esta conversa.</p>:thread.messages.map(m=><div key={m.id} className={`flex ${m.direction==="outbound"?"justify-end":"justify-start"}`}><div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-[12px] leading-6 shadow-sm sm:max-w-[70%] ${m.direction==="outbound"?"rounded-tr-sm border border-[#c6dfcf] bg-[#e3f3e8] text-[#345844]":"rounded-tl-sm border border-[#e7eaea] bg-white text-[#304047]"}`}><p>{m.text||"Mensagem sem texto"}</p><div className="mt-1 flex items-center justify-end gap-2 text-[10px] opacity-60"><span>{dateTime(m.sent_at||m.created_at)}</span>{m.direction==="outbound"&&<span>{m.status}</span>}</div></div></div>)}{thread&&thread.outbound.length>0&&<div className="mx-auto max-w-xl rounded-xl border border-[#e2e7de] bg-[#f0f3eb] p-3 text-xs text-[#657c67]"><p className="mb-2 font-semibold">Fila de envio</p>{thread.outbound.map(o=><p key={o.id} className="mt-1 break-words">• {o.status}: {o.body.slice(0,150)}</p>)}</div>}</div>
+            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-7 sm:px-8"><div className="mb-6 text-center"><span className="rounded-full bg-white px-3 py-1.5 text-[10px] text-[#87999a]">Histórico do CRM</span></div>{currentThread===null?<p className="flex items-center justify-center gap-2 py-10 text-xs text-[#8d9b9b]"><Loader2 size={15} className="animate-spin"/> Consultando mensagens...</p>:currentThread.messages.length===0?<p className="py-10 text-center text-xs text-[#95a4a4]">Sem mensagens registradas para esta conversa.</p>:currentThread.messages.map(m=><div key={m.id} className={`flex ${m.direction==="outbound"?"justify-end":"justify-start"}`}><div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-[12px] leading-6 shadow-sm sm:max-w-[70%] ${m.direction==="outbound"?"rounded-tr-sm border border-[#c6dfcf] bg-[#e3f3e8] text-[#345844]":"rounded-tl-sm border border-[#e7eaea] bg-white text-[#304047]"}`}><p>{m.text||"Mensagem sem texto"}</p><div className="mt-1 flex items-center justify-end gap-2 text-[10px] opacity-60"><span>{dateTime(m.sent_at||m.created_at)}</span>{m.direction==="outbound"&&<span>{m.status}</span>}</div></div></div>)}{currentThread&&currentThread.outbound.length>0&&<div className="mx-auto max-w-xl rounded-xl border border-[#e2e7de] bg-[#f0f3eb] p-3 text-xs text-[#657c67]"><p className="mb-2 font-semibold">Fila de envio</p>{currentThread.outbound.map(o=><p key={o.id} className="mt-1 break-words">• {o.status}: {o.body.slice(0,150)}</p>)}</div>}</div>
             {error&&<div role="alert" className="mx-4 mb-2 flex items-center gap-2 rounded-xl bg-[#fff2ec] px-4 py-3 text-xs text-[#ae6549]"><CircleAlert size={17}/>{error}</div>}
             {message&&<div role="status" className="mx-4 mb-2 rounded-xl bg-[#e7f3e9] px-4 py-3 text-xs text-[#397758]">{message}</div>}
             <div className="border-t border-[#e6ebe8] bg-white px-4 py-4 sm:px-6"><div className="rounded-xl border border-[#e0e7e4] bg-[#fafcfa] p-3 focus-within:border-[#8cb7a0]"><textarea aria-label="Resposta ao cliente" rows={2} value={draft} onChange={e=>{setDraft(e.target.value);setPendingReplyId(null)}} placeholder={myConversation?"Escreva sua resposta ao cliente...":"Assuma a conversa antes de responder"} disabled={!myConversation||selectedConversation.status==="resolved"} className="block w-full resize-none bg-transparent text-[12px] leading-6 outline-none placeholder:text-[#a2aeaa] disabled:cursor-not-allowed"/><div className="mt-2 flex items-center justify-between border-t border-[#e8eeea] pt-2"><span className="flex items-center gap-1.5 text-[10px] text-[#97a7a1]"><ShieldCheck size={14}/> {sendEnabled?"Fila protegida · envio confirmado pelo provedor":"Envio não habilitado"}</span><button type="button" disabled={busy||!canReply} onClick={()=>void reply()} className="flex items-center gap-2 rounded-lg bg-[#20584a] px-4 py-2.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#bfcbc5]"><Send size={14}/> Enviar mensagem</button></div></div></div>
