@@ -55,10 +55,16 @@ export async function POST(request:Request){
         ? (live.config.metadata as Record<string,unknown>)["crm.tenant_id"] : null
       // Never take over an existing session if tenant ownership cannot be proven.
       if(existingTenant!==operator.tenantId)throw new Error("session_ownership_unknown")
-      return Response.json({ok:true,status:live.status||"UNKNOWN",alreadyExists:true},{headers:noStore})
+      // Starting an OWNED, STOPPED session is safe; never stop/restart/log out an active session.
+      const status=String(live.status||"UNKNOWN").toUpperCase()
+      if(status==="STOPPED"){
+        const started=await wahaApi<{status?:string}>(`/api/sessions/${session}/start`,"POST")
+        return Response.json({ok:true,status:started.status||"STARTING",alreadyExists:true},{headers:noStore})
+      }
+      return Response.json({ok:true,status,alreadyExists:true},{headers:noStore})
     }
     // A new, tenant-derived session can be created only on the dedicated CRM provider.
-    // This never changes any existing session nor calls stop/restart/logout.
+    // This never alters another company session or calls stop/restart/logout.
     const created=await wahaApi<{status?:string}>(`/api/sessions`,"POST",{
       name:session,config:{
         metadata:{"crm.tenant_id":operator.tenantId},
@@ -70,7 +76,10 @@ export async function POST(request:Request){
         }],
       },
     })
-    return Response.json({ok:true,status:created.status||"STARTING",alreadyExists:false},{headers:noStore})
+    // WAHA session creation alone does not guarantee a QR. Start the new
+    // tenant-scoped session so that the status can transition to SCAN_QR_CODE.
+    const started=await wahaApi<{status?:string}>(`/api/sessions/${session}/start`,"POST")
+    return Response.json({ok:true,status:started.status||created.status||"STARTING",alreadyExists:false},{headers:noStore})
   }catch(err){
     const name=err instanceof Error?err.message:"session_setup_unavailable"
     const status=["session_ownership_unknown","channel_not_isolated","waha_dedicated_instance_required"].includes(name)?409:
