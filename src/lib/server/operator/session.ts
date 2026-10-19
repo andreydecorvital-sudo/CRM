@@ -1,114 +1,102 @@
-import { createHmac, timingSafeEqual } from "node:crypto"
 import { cookies } from "next/headers"
-import { supabaseRest } from "../supabase/rest"
+import { operatorAuthRequest, operatorRest, operatorSupabaseConfig } from "./auth-rest"
 
-const COOKIE_NAME = "crm_internal_pilot"
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const MAX_AGE_SECONDS = 60 * 60 * 8
+const COOKIE_TOKEN="crm_operator_token"
+const COOKIE_TENANT="crm_operator_tenant"
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+type Role="owner"|"admin"|"manager"|"agent"|"viewer"
+type Member={tenant_id:string;role:Role}
+export type Operator={userId:string;tenantId:string;role:Role;accessToken:string}
 
-type Ticket = { userId: string; tenantId: string; expiresAt: number }
-export type Operator = { userId: string; tenantId: string; role: "owner"|"admin"|"manager"|"agent"|"viewer" }
-
-function secrets() {
-  const secret = process.env.CRM_OPERATOR_SESSION_SECRET || ""
-  const tenantId = process.env.CRM_OPERATOR_TENANT_ID || ""
-  if (secret.length < 32 || !UUID.test(tenantId)) return null
-  return { secret, tenantId }
+export function pilotConfigured(){return Boolean(operatorSupabaseConfig())}
+function cookieOptions(maxAge:number) {
+  return {httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"strict" as const,
+    path:"/",maxAge}
+}
+async function memberships(token:string,userId:string):Promise<Member[]>{
+  const rows=await operatorRest<Member[]>(
+    token,"GET",`/tenant_members?user_id=eq.${userId}&select=tenant_id,role&order=tenant_id.asc&limit=100`)
+  return Array.isArray(rows)?rows.filter(m=>UUID.test(m.tenant_id)
+    && ["owner","admin","manager","agent","viewer"].includes(m.role)):[]
 }
 
-export function pilotConfigured() {
-  return Boolean(secrets() && process.env.SUPABASE_URL
-    && process.env.SUPABASE_SERVICE_ROLE_KEY
-    && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY))
+async function verifiedUser(token:string):Promise<string|null> {
+  if(!token || token.length>8192)return null
+  const response=await operatorAuthRequest("/user",token)
+  if(!response.ok)return null
+  const user=await response.json() as {id?:string}
+  return typeof user.id==="string"&&UUID.test(user.id)?user.id:null
 }
 
-function sign(payload: string, secret: string) {
-  return createHmac("sha256", secret).update(payload).digest("base64url")
-}
-
-function makeTicket(ticket: Ticket, secret: string) {
-  const payload = Buffer.from(JSON.stringify(ticket)).toString("base64url")
-  return `${payload}.${sign(payload, secret)}`
-}
-
-function readTicket(raw: string | undefined, secret: string): Ticket | null {
-  if (!raw || raw.length > 2048) return null
-  const parts = raw.split(".")
-  if (parts.length !== 2) return null
-  const [payload, mac] = parts
-  const expected = Buffer.from(sign(payload,secret))
-  const supplied = Buffer.from(mac)
-  if (expected.length !== supplied.length || !timingSafeEqual(expected,supplied)) return null
-  try {
-    const decoded: unknown = JSON.parse(Buffer.from(payload,"base64url").toString("utf8"))
-    if (!decoded || typeof decoded !== "object") return null
-    const ticket = decoded as Ticket
-    if (!UUID.test(ticket.userId) || !UUID.test(ticket.tenantId) || !Number.isFinite(ticket.expiresAt)
-      || ticket.expiresAt <= Date.now() || ticket.expiresAt > Date.now() + MAX_AGE_SECONDS * 1000) return null
-    return ticket
-  } catch { return null }
-}
-
-async function membership(userId: string, tenantId: string): Promise<Operator | null> {
-  const rows = await supabaseRest<Array<{role:Operator["role"]}>>(
-    "GET",
-    `/tenant_members?tenant_id=eq.${tenantId}&user_id=eq.${userId}&select=role&limit=1`,
-  )
-  const role = rows?.[0]?.role
-  if (!role || !["owner","admin","manager","agent","viewer"].includes(role)) return null
-  return { userId, tenantId, role }
-}
-
-export async function operatorFromCookie(): Promise<Operator | null> {
-  const config=secrets()
-  if (!config) return null
+export async function operatorFromCookie():Promise<Operator|null>{
+  if(!pilotConfigured())return null
   const store=await cookies()
-  const ticket=readTicket(store.get(COOKIE_NAME)?.value,config.secret)
-  if (!ticket || ticket.tenantId !== config.tenantId) return null
-  return membership(ticket.userId,ticket.tenantId)
+  const token=store.get(COOKIE_TOKEN)?.value||""
+  if(!token)return null
+  try{
+    const userId=await verifiedUser(token)
+    if(!userId)return null
+    const memberList=await memberships(token,userId)
+    const requested=store.get(COOKIE_TENANT)?.value
+    // The tenant cookie is NOT an authorization grant; membership is checked again.
+    const member=memberList.find(m=>m.tenant_id===requested)??memberList[0]
+    if(!member)return null
+    const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
+      `/tenants?id=eq.${member.tenant_id}&select=id,status&limit=1`)
+    if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return null
+    return {userId,tenantId:member.tenant_id,role:member.role,accessToken:token}
+  }catch{return null}
 }
 
-export async function signInOperator(email: string, password: string): Promise<boolean> {
-  const config=secrets()
-  if (!config || !pilotConfigured()) return false
-  if (email.length > 320 || password.length > 1024 || !email.includes("@")) return false
-  const url=String(process.env.SUPABASE_URL).replace(/\/+$/,"")
-  const key=process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ""
-  const response=await fetch(`${url}/auth/v1/token?grant_type=password`,{
-    method:"POST",cache:"no-store",
-    headers:{apikey:key,"Content-Type":"application/json"},
-    body:JSON.stringify({email,password}),
-    signal:AbortSignal.timeout(10000),
-  })
-  if (!response.ok) return false
-  const login = await response.json() as { user?: {id?:string} }
-  if (!login.user?.id || !UUID.test(login.user.id)) return false
-  const member=await membership(login.user.id,config.tenantId)
-  if (!member || member.role==="viewer") return false
-  const ticket=makeTicket({
-    userId:login.user.id,tenantId:config.tenantId,
-    expiresAt:Date.now()+MAX_AGE_SECONDS*1000,
-  },config.secret)
+export async function signInOperator(email:string,password:string):Promise<boolean>{
+  if(!pilotConfigured()||!email.includes("@")||email.length>320||!password||password.length>1024)return false
+  const res=await operatorAuthRequest("/token?grant_type=password",undefined,{email,password})
+  if(!res.ok)return false
+  const result=await res.json() as {access_token?:string;expires_in?:number;user?:{id?:string}}
+  if(!result.access_token||typeof result.user?.id!=="string"||!UUID.test(result.user.id))return false
+  const token=result.access_token
+  const memberList=await memberships(token,result.user.id)
+  const first=memberList[0]
+  if(!first)return false
+  const tenants=await operatorRest<Array<{id:string;status:string}>>(token,"GET",
+    `/tenants?id=eq.${first.tenant_id}&select=id,status&limit=1`)
+  if(!tenants?.[0]||!["active","trial"].includes(tenants[0].status))return false
+  const seconds=Math.max(1,Math.min(3600,Math.floor(result.expires_in||3600)-30))
   const store=await cookies()
-  store.set(COOKIE_NAME,ticket,{
-    httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"strict",
-    path:"/",maxAge:MAX_AGE_SECONDS,
-  })
+  store.set(COOKIE_TOKEN,token,cookieOptions(seconds))
+  store.set(COOKIE_TENANT,first.tenant_id,cookieOptions(seconds))
   return true
 }
 
-export async function signOutOperator() {
+export async function listOperatorTenants(operator:Operator){
+  const memberList=await memberships(operator.accessToken,operator.userId)
+  const rows=await operatorRest<Array<{id:string;name:string;status:string}>>(
+    operator.accessToken,"GET","/tenants?select=id,name,status&order=name.asc&limit=100")
+  return rows.filter(t=>memberList.some(m=>m.tenant_id===t.id)&&["active","trial"].includes(t.status))
+    .map(t=>({...t,selected:t.id===operator.tenantId}))
+}
+
+export async function selectOperatorTenant(operator:Operator,tenantId:string){
+  if(!UUID.test(tenantId))return false
+  const allowed=await listOperatorTenants(operator)
+  if(!allowed.some(t=>t.id===tenantId))return false
   const store=await cookies()
-  store.delete(COOKIE_NAME)
+  const tokenCookie=store.get(COOKIE_TOKEN)
+  store.set(COOKIE_TENANT,tenantId,cookieOptions(tokenCookie?.maxAge||1800))
+  return true
 }
 
-export function safeMutationOrigin(request: Request): boolean {
+export async function signOutOperator(){
+  const store=await cookies()
+  store.delete(COOKIE_TOKEN)
+  store.delete(COOKIE_TENANT)
+}
+export function safeMutationOrigin(request:Request):boolean{
   const origin=request.headers.get("origin")
-  if (!origin) return false
-  try { return new URL(origin).origin===new URL(request.url).origin }
-  catch { return false }
+  if(!origin)return false
+  try{return new URL(origin).origin===new URL(request.url).origin}
+  catch{return false}
 }
-
-export function forbiddenResponse() {
+export function forbiddenResponse(){
   return Response.json({error:"not_authenticated"},{status:401,headers:{"Cache-Control":"no-store"}})
 }
