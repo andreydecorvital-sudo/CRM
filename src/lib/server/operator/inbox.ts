@@ -69,8 +69,8 @@ export async function readThread(operator:Operator,id:string):Promise<InboxThrea
   const tenant=operator.tenantId
   const [contacts,depts,messages,outbound]=await Promise.all([
     contactMap(operator,[row.contact_id]),departmentMap(operator,[row.department_id||""]),
-    supabaseRest<MessageRow[]>("GET",`/messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&select=id,direction,actor,text,status,created_at,sent_at&order=created_at.desc&limit=150`),
-    supabaseRest<Array<{id:string;body:string;status:string;created_at:string}>>("GET",`/outbound_messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&status=in.(pending,queued,sending,failed,suppressed)&select=id,body,status,created_at&order=created_at.desc&limit=20`),
+    operatorRest<MessageRow[]>(operator.accessToken,"GET",`/messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&select=id,direction,actor,text,status,created_at,sent_at&order=created_at.desc&limit=150`),
+    operatorRest<Array<{id:string;body:string;status:string;created_at:string}>>(operator.accessToken,"GET",`/outbound_messages?tenant_id=eq.${tenant}&conversation_id=eq.${id}&status=in.(pending,queued,sending,failed,suppressed)&select=id,body,status,created_at&order=created_at.desc&limit=20`),
   ])
   return {conversation:view(row,contacts.get(row.contact_id),depts.get(row.department_id||"")),messages:(messages||[]).reverse(),outbound:outbound||[]}
 }
@@ -125,11 +125,11 @@ export async function queueOperatorReply(operator:Operator,id:string,bodyRaw:str
   if(!row.last_inbound_at || Date.now()-new Date(row.last_inbound_at).getTime()>24*60*60*1000) {
     throw new Error("outside_customer_service_window")
   }
-  const connected=await supabaseRest<Array<{id:string}>>("GET",
+  const connected=await operatorRest<Array<{id:string}>>(operator.accessToken,"GET",
     `/whatsapp_connections?tenant_id=eq.${operator.tenantId}&status=eq.connected&select=id&limit=1`)
   if(!connected?.length)throw new Error("whatsapp_not_connected")
   const dedupeKey=`operator:${id}:${operationId}`
-  const existing=await supabaseRest<Array<{id:string;status:string}>>("GET",
+  const existing=await operatorRest<Array<{id:string;status:string}>>(operator.accessToken,"GET",
     `/outbound_messages?tenant_id=eq.${operator.tenantId}&dedupe_key=eq.${qs(dedupeKey)}&select=id,status&limit=1`)
   if(existing?.[0])return existing[0]
   const payload=[{
