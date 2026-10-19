@@ -24,9 +24,19 @@ export default function OperatorLogin() {
       })
       const data=await res.json() as {ok?:boolean;error?:string}
       if(!res.ok) {
-        setError(mode==="create"
-          ?"Não foi possível criar a conta. Verifique o e-mail ou tente novamente. O serviço de cadastro pode não estar habilitado."
-          :res.status===503?"Não foi possível acessar a autenticação.":"E-mail ou senha inválidos, ou e-mail ainda não confirmado.")
+        if(mode==="login"){
+          const reasons:Record<string,string>={
+            email_not_confirmed:"Seu cadastro existe, mas o e-mail ainda não foi confirmado. Confira sua caixa de entrada e o spam, ou use Reenviar confirmação abaixo.",
+            invalid_credentials:"E-mail ou senha incorretos. Se você acabou de se cadastrar, confirme o e-mail antes de tentar entrar.",
+            too_many_attempts:"Houve muitas tentativas. Aguarde o limite do Supabase e tente novamente.",
+            auth_unavailable:"A autenticação está indisponível no momento. Sua conta não foi apagada.",
+          }
+          setError(reasons[data.error||""]||"Não foi possível entrar. Confira os dados e tente novamente.")
+        }else {
+          setError(data.error==="invalid_registration"
+            ?"Use um e-mail válido e uma senha com pelo menos 12 caracteres."
+            :"Não foi possível concluir o cadastro. Confira os dados e a disponibilidade do serviço de e-mail.")
+        }
         return
       }
       if(mode==="create") {
@@ -40,6 +50,25 @@ export default function OperatorLogin() {
     } catch {
       setError("Não conseguimos acessar o servidor de autenticação. Tente novamente.")
     } finally {setBusy(false)}
+  }
+
+  async function resendConfirmation(){
+    if(!email.trim()||!email.includes("@")){setError("Informe seu e-mail antes de reenviar a confirmação.");return}
+    setBusy(true);setError("");setNotice("")
+    try{
+      const response=await fetch("/api/operator/onboarding",{
+        method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",
+        body:JSON.stringify({action:"resend_confirmation",email:email.trim()}),
+      })
+      if(!response.ok){
+        setError(response.status===429
+          ?"O serviço de e-mail limitou os reenvios. Aguarde antes de tentar novamente."
+          :"Não foi possível solicitar a confirmação. Confira o serviço de e-mail do Supabase.")
+        return
+      }
+      setNotice("Se seu cadastro estiver aguardando confirmação, enviaremos um novo e-mail. Confira também o spam.")
+    }catch{setError("Não foi possível acessar o serviço de confirmação de e-mail.")}
+    finally{setBusy(false)}
   }
 
   const create=mode==="create"
@@ -72,6 +101,7 @@ export default function OperatorLogin() {
             {busy?"Verificando...":create?"Criar conta":"Entrar na central"}<ArrowRight size={17}/>
           </button>
         </form>
+        {!create&&<button type="button" disabled={busy||!email.includes("@")} onClick={()=>void resendConfirmation()} className="mt-4 block w-full text-center text-[12px] font-semibold text-[#3b8063] hover:underline disabled:cursor-not-allowed disabled:text-[#a1ada4]">Não recebeu o e-mail? Reenviar confirmação</button>}
         <p className="mt-6 flex items-start gap-2 border-t border-[#eff1f2] pt-5 text-[11px] leading-5 text-[#87939c]"><ShieldCheck size={17} className="shrink-0 text-[#508468]"/> Cada empresa terá seus próprios dados e somente pessoas autorizadas poderão acessá-los.</p>
       </div>
     </main>
