@@ -41,6 +41,8 @@ export async function POST(request:Request){
     const webhookSecret=process.env.WHATSAPP_WEBHOOK_SECRET?.trim()||""
     const appUrl=process.env.NEXT_PUBLIC_APP_URL?.trim()||""
     if(webhookSecret.length<32)throw new Error("webhook_not_configured")
+    // Pairing without an enabled database-backed webhook would silently lose inbound messages.
+    if(!process.env.SUPABASE_SECRET_KEY&&!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error("inbound_backend_not_configured")
     let url:URL
     try{
       url=new URL(appUrl)
