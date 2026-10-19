@@ -21,8 +21,13 @@ export async function POST(request:Request) {
   const password=typeof body?.password==="string"?body.password:""
   if(!email||!password)return Response.json({error:"invalid_credentials"},{status:401})
   try {
-    const valid=await signInOperator(email,password)
-    if(!valid)return Response.json({error:"invalid_credentials_or_membership"},{status:401})
+    const result=await signInOperator(email,password)
+    if(!result.ok){
+      const status=result.reason==="email_not_confirmed"?403:
+        result.reason==="too_many_attempts"?429:
+        result.reason==="auth_unavailable"?503:401
+      return Response.json({error:result.reason},{status,headers:{"Cache-Control":"no-store"}})
+    }
     return Response.json({ok:true},{headers:{"Cache-Control":"no-store"}})
   }catch{return Response.json({error:"authentication_unavailable"},{status:503})}
 }
