@@ -27,6 +27,7 @@ beforeEach(()=>{
   vi.mocked(getRemoteSession).mockResolvedValue({session,connection:{id:"conn",provider:"waha",status:"disconnected",config:{session},phone_e164:null}})
   process.env.WHATSAPP_WEBHOOK_SECRET="test-webhook-secret-longer-than-32-chars"
   process.env.NEXT_PUBLIC_APP_URL="https://crm.example.com"
+  process.env.SUPABASE_SECRET_KEY="sb_secret_example_test_only"
 })
 
 describe("WAHA pairing starts only tenant-owned sessions",()=>{
@@ -60,6 +61,13 @@ describe("WAHA pairing starts only tenant-owned sessions",()=>{
     const res=await POST(req())
     expect(res.status).toBe(409)
     expect(remote).toHaveBeenCalledTimes(1)
+  })
+  it("blocks QR pairing when database-backed inbound webhook is not ready",async()=>{
+    delete process.env.SUPABASE_SECRET_KEY
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    const res=await POST(req())
+    expect(res.status).toBe(503)
+    expect(remote).not.toHaveBeenCalled()
   })
   it("denies operation for an unauthenticated user",async()=>{
     vi.mocked(operatorFromCookie).mockResolvedValue(null)
