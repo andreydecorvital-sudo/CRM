@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { supabaseRest } from "../src/lib/server/supabase/rest"
+import { operatorRest } from "../src/lib/server/operator/auth-rest"
 import { changeConversation, listInbox, queueOperatorReply, readThread } from "../src/lib/server/operator/inbox"
 import type { Operator } from "../src/lib/server/operator/session"
 
-vi.mock("../src/lib/server/supabase/rest",()=>({supabaseRest:vi.fn()}))
+vi.mock("../src/lib/server/operator/auth-rest",()=>({operatorRest:vi.fn()}))
 
 const tenant="11111111-1111-4111-8111-111111111111"
 const otherTenant="22222222-2222-4222-8222-222222222222"
 const user="33333333-3333-4333-8333-333333333333"
 const contact="44444444-4444-4444-8444-444444444444"
 const conversation="55555555-5555-4555-8555-555555555555"
-const actor:Operator={tenantId:tenant,userId:user,role:"agent"}
-const mock=vi.mocked(supabaseRest)
+const actor:Operator={tenantId:tenant,userId:user,role:"agent",accessToken:"test-session-token"}
+const mock=vi.mocked(operatorRest)
 
 function row(overrides:Record<string,unknown>={}) {
  return {
@@ -26,14 +26,14 @@ afterEach(()=>{delete process.env.CRM_OPERATOR_SEND_ENABLED})
 
 describe("CRM internal Inbox",()=>{
  it("requires server tenant filter for list and contact lookup",async()=>{
-   mock.mockImplementation(async (_method,path)=>{
+   mock.mockImplementation(async (_token,_method,path)=>{
      if(path.startsWith("/conversations?"))return [row()] as never
      if(path.startsWith("/contacts?"))return [{id:contact,display_name:"Maria",phone_e164:"+5511999999999",email:null,city:"SP",temperature:"hot"}] as never
      return [] as never
    })
    const result=await listInbox(actor)
    expect(result[0].name).toBe("Maria")
-   expect(mock.mock.calls.every(call=>String(call[1]).includes(`tenant_id=eq.${tenant}`))).toBe(true)
+   expect(mock.mock.calls.every(call=>String(call[2]).includes(`tenant_id=eq.${tenant}`))).toBe(true)
    expect(mock.mock.calls.some(call=>String(call[1]).includes(otherTenant))).toBe(false)
  })
  it("rejects invalid conversation ID before reading the database",async()=>{
@@ -42,14 +42,14 @@ describe("CRM internal Inbox",()=>{
  })
  it("claims conversation, disables AI and verifies persisted status",async()=>{
    let updated=false
-   mock.mockImplementation(async (method,path)=>{
+   mock.mockImplementation(async (_token,method,path)=>{
      if(method==="GET"&&path.startsWith("/conversations?"))return [row(updated?{assigned_to:user,ai_mode:"off",status:"open"}:{})] as never
      if(method==="PATCH"){updated=true;return null as never}
      return [] as never
    })
    await changeConversation(actor,conversation,"claim")
-   const patch=mock.mock.calls.find(call=>call[0]==="PATCH")
-   expect(patch?.[2]).toMatchObject({assigned_to:user,ai_mode:"off"})
+   const patch=mock.mock.calls.find(call=>call[1]==="PATCH")
+   expect(patch?.[3]).toMatchObject({assigned_to:user,ai_mode:"off"})
  })
  it("prevents an ordinary operator taking conversation owned by another person",async()=>{
    mock.mockResolvedValueOnce([row({assigned_to:otherTenant})] as never)
