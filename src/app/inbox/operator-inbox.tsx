@@ -38,7 +38,7 @@ const errorTranslation:Record<string,string>={
  operation_failed:"Não foi possível concluir a operação."
 }
 
-export default function OperatorInbox({operatorId,role}:{operatorId:string;role:string}) {
+export default function OperatorInbox({operatorId}:{operatorId:string}) {
   const router=useRouter()
   const [list,setList]=useState<Conversation[]>([])
   const [selected,setSelected]=useState<string|null>(null)
