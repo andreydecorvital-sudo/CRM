@@ -35,6 +35,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const publicSurface = pathname.startsWith("/review/") || pathname.startsWith("/proposal/")
 
+  if (pathname.startsWith("/inbox")) return <main>{children}</main>
+
   if (publicSurface) {
     return (
       <div className="min-h-screen">
