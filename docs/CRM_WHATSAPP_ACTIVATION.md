@@ -24,7 +24,7 @@
 
 `GET /api/operator/whatsapp` devolve apenas indicadores booleanos de presença das variáveis no servidor e informações não secretas da conexão autorizada pelo JWT/RLS. Nunca retorna chaves, senha, config completo, QR ou segredo do webhook. Status salvo `connected` **não prova** `WORKING` remoto.
 
-A página `/settings/whatsapp` não executa `provision/start/restart/stop/logout` e não altera Railway/Supabase. A API de operador limita a consulta a `owner`, `admin` e `manager`.
+A página `/settings/whatsapp` disponibiliza botões de preparo e QR, mas só executa operações quando um administrador autenticado clica explicitamente, após os pré-requisitos de isolamento. Não executa stop/restart/logout nem altera o WAHA do Argoplace. A API de operador limita a consulta a `owner`, `admin` e `manager`.
 
 ## Pendências para conclusão
 
@@ -35,3 +35,26 @@ A página `/settings/whatsapp` não executa `provision/start/restart/stop/logout
 - Revisão da política de uso/termos do provedor para uso comercial.
 
 **Não declarar o canal conectado apenas porque a Vercel compilou a página.**
+
+
+## Fluxo de conexão preparado no PR #7
+
+1. Administrador autenticado da empresa abre `/settings/whatsapp` e clica em **Registrar canal da empresa**.
+   - API: `POST /api/operator/whatsapp` com `action=prepare`.
+   - Migration `202610190001_whatsapp_operator_registration.sql` necessária no Supabase CRM correto. Insere apenas `waha`/disconnected, nome `crm_<uuid-sem-tracos>`, proibindo uso de sessões de outro tenant.
+2. Somente após definir credenciais de um **WAHA dedicado** com `CRM_WAHA_DEDICATED_INSTANCE=true`, `WAHA_BASE_URL`, `WAHA_API_KEY`, `WHATSAPP_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`, pode clicar em **Preparar sessão WAHA**.
+   - API: `POST /api/operator/whatsapp/pairing`, com confirmação explícita.
+   - Nunca altera/para/reinicia uma sessão existente. Se já existir com proprietário não comprovado, bloqueia.
+   - Configura webhook no endereço canônico da Vercel do CRM com segredo enviado somente servidor → WAHA.
+3. Clica em **Exibir QR**.
+   - API: `GET /api/operator/whatsapp/pairing`, somente owner/admin.
+   - QR base64 protegido por autenticação e cabeçalho `Cache-Control: no-store`; sessão precisa estar em `SCAN_QR_CODE`.
+   - O pareamento só acontece após o titular escanear no aparelho autorizado.
+4. Confere `WORKING` e teste autorizado de inbound no CRM, sem ativar envio até verificação independente.
+
+### Restrições reais
+
+- **Nenhuma migration SQL foi aplicada no Supabase em nome do usuário nesta alteração.** A conexão do Supabase que o agente dispõe não acessa `ydyzjpcmavqffdazteib`; o instalador não pode pular essa etapa.
+- **Não foi criada nova instância WAHA.** A Railway existente pertence ao Argoplace e permanece intocada. Novo serviço/custo/licença dependem de aprovação.
+- Até a credencial e a instância dedicadas existirem, QR e start falham de maneira segura com erro recuperável.
+- Esta mudança fica em branch/PR, não faz merge ou deploy de produção.
