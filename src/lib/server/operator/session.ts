@@ -19,7 +19,7 @@ function secrets() {
 export function pilotConfigured() {
   return Boolean(secrets() && process.env.SUPABASE_URL
     && process.env.SUPABASE_SERVICE_ROLE_KEY
-    && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY))
+    && (process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY))
 }
 
 function sign(payload: string, secret: string) {
@@ -73,7 +73,7 @@ export async function signInOperator(email: string, password: string): Promise<b
   if (!config || !pilotConfigured()) return false
   if (email.length > 320 || password.length > 1024 || !email.includes("@")) return false
   const url=String(process.env.SUPABASE_URL).replace(/\/+$/,"")
-  const key=process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || ""
+  const key=process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ""
   const response=await fetch(`${url}/auth/v1/token?grant_type=password`,{
     method:"POST",cache:"no-store",
     headers:{apikey:key,"Content-Type":"application/json"},
