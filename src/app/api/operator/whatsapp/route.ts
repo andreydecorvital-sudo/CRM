@@ -1,5 +1,6 @@
 import { operatorRest } from "@/lib/server/operator/auth-rest"
-import { operatorFromCookie, forbiddenResponse } from "@/lib/server/operator/session"
+import { operatorFromCookie, forbiddenResponse, safeMutationOrigin } from "@/lib/server/operator/session"
+import { registerOwnWahaChannel } from "@/lib/server/operator/whatsapp-setup"
 
 export const dynamic = "force-dynamic"
 type ConnectionRow = {
@@ -68,5 +69,22 @@ export async function GET() {
       error:"whatsapp_diagnostics_unavailable",
       checks,providers:[],readyForPairing:false,connectedVerified:false,
     },{status:503,headers:{"Cache-Control":"no-store"}})
+  }
+}
+
+export async function POST(request:Request){
+  if(!safeMutationOrigin(request))return Response.json({error:"origin_rejected"},{status:403})
+  const operator=await operatorFromCookie()
+  if(!operator)return forbiddenResponse()
+  if(!["owner","admin"].includes(operator.role))return Response.json({error:"role_not_allowed"},{status:403})
+  const payload=await request.json().catch(()=>null)
+  if(payload?.action!=="prepare")return Response.json({error:"unknown_action"},{status:400})
+  try{
+    const result=await registerOwnWahaChannel(operator)
+    return Response.json({ok:true,...result},{status:result.alreadyExists?200:201,headers:{"Cache-Control":"no-store"}})
+  }catch(err){
+    const name=err instanceof Error?err.message:"connection_failed"
+    const status=name==="channel_not_isolated"?409:name==="operator_access_denied"?403:503
+    return Response.json({error:status===503?"channel_registration_unavailable":name},{status})
   }
 }
