@@ -61,6 +61,12 @@ describe("CRM internal Inbox",()=>{
      .rejects.toThrow("outbound_not_enabled")
    expect(mock).not.toHaveBeenCalled()
  })
+ it("revoking write privileges blocks outbound even if the session is still present",async()=>{
+   process.env.CRM_OPERATOR_SEND_ENABLED="true"
+   await expect(queueOperatorReply({...actor,role:"viewer"},conversation,"Olá","77777777-7777-4777-8777-777777777777",true))
+     .rejects.toThrow("operator_read_only")
+   expect(mock).not.toHaveBeenCalled()
+ })
  it("does not queue without deliberate confirmation",async()=>{
    process.env.CRM_OPERATOR_SEND_ENABLED="true"
    await expect(queueOperatorReply(actor,conversation,"Olá","66666666-6666-4666-8666-666666666666",false))
