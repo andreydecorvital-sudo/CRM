@@ -11,5 +11,5 @@ export default async function InboxPage() {
   }
   const operator=await operatorFromCookie().catch(()=>null)
   if(!operator)return <OperatorLogin/>
-  return <OperatorInbox operatorId={operator.userId} role={operator.role}/>
+  return <OperatorInbox operatorId={operator.userId}/>
 }
