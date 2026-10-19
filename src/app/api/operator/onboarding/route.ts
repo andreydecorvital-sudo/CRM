@@ -8,6 +8,17 @@ export async function POST(request:Request) {
   if(!pilotConfigured())return Response.json({error:"auth_not_configured"},{status:503,headers:noStore})
   const body=await request.json().catch(()=>null)
   const email=typeof body?.email==="string"?body.email.trim().toLowerCase():""
+  if(body?.action==="resend_confirmation"){
+    if(email.length>320||!email.includes("@"))return Response.json({error:"invalid_email"},{status:400,headers:noStore})
+    try {
+      const { operatorAuthRequest } = await import("@/lib/server/operator/auth-rest")
+      const reply=await operatorAuthRequest("/resend",undefined,{type:"signup",email})
+      // Always respond generically: never confirm whether an email is registered.
+      if(reply.status===429)return Response.json({error:"too_many_attempts"},{status:429,headers:noStore})
+      if(reply.status>=500)return Response.json({error:"email_delivery_unavailable"},{status:503,headers:noStore})
+      return Response.json({ok:true,message:"Se houver um cadastro pendente, enviaremos uma confirmação."},{status:202,headers:noStore})
+    }catch{return Response.json({error:"email_delivery_unavailable"},{status:503,headers:noStore})}
+  }
   const password=typeof body?.password==="string"?body.password:""
   if(email.length>320||!email.includes("@")||password.length<12||password.length>1024){
     return Response.json({error:"invalid_registration"},{status:400,headers:noStore})
