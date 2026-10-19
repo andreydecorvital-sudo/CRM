@@ -81,8 +81,7 @@ export async function selectOperatorTenant(operator:Operator,tenantId:string){
   const allowed=await listOperatorTenants(operator)
   if(!allowed.some(t=>t.id===tenantId))return false
   const store=await cookies()
-  const tokenCookie=store.get(COOKIE_TOKEN)
-  store.set(COOKIE_TENANT,tenantId,cookieOptions(tokenCookie?.maxAge||1800))
+  store.set(COOKIE_TENANT,tenantId,cookieOptions(1800))
   return true
 }
 
