@@ -42,7 +42,7 @@ export async function GET() {
     {key:"WAHA_API_KEY",label:"Chave de acesso ao WAHA",ok:configured("WAHA_API_KEY")},
     {key:"CRM_WAHA_DEDICATED_INSTANCE",label:"Instância exclusiva confirmada",ok:process.env.CRM_WAHA_DEDICATED_INSTANCE==="true"},
     {key:"WHATSAPP_WEBHOOK_SECRET",label:"Assinatura do webhook",ok:configured("WHATSAPP_WEBHOOK_SECRET")},
-    {key:"SUPABASE_SERVICE_ROLE_KEY",label:"Acesso do worker ao banco (somente servidor)",ok:configured("SUPABASE_SERVICE_ROLE_KEY")},
+    {key:"SUPABASE_SECRET_KEY",label:"Acesso seguro ao banco (somente servidor)",ok:configured("SUPABASE_SECRET_KEY")||configured("SUPABASE_SERVICE_ROLE_KEY")},
     {key:"NEXT_PUBLIC_APP_URL",label:"Endereço HTTPS público do CRM",ok:configured("NEXT_PUBLIC_APP_URL")},
   ]
   try{
