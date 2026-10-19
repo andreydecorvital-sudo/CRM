@@ -1,7 +1,7 @@
 "use client"
 
 import WorkspaceNavigation from "../workspace-navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, CheckCheck, ChevronLeft, CircleAlert, Inbox, Loader2, LogOut, MessageCircle, RefreshCw, Search, Send, ShieldCheck, UserRoundCheck, UserRoundX, Users, X } from "lucide-react"
 
@@ -14,10 +14,11 @@ type Message={id:string;direction:"inbound"|"outbound";actor:string;text:string;
 type Thread={conversation:Conversation;messages:Message[];outbound:Array<{id:string;body:string;status:string;created_at:string}>}
 type Filter="all"|"unread"|"mine"|"open"
 
+const dateFormatter=new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})
 function dateTime(value:string|null) {
   if(!value)return "—"
   const date=new Date(value)
-  return Number.isNaN(date.getTime())?"—":new Intl.DateTimeFormat("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(date)
+  return Number.isNaN(date.getTime())?"—":dateFormatter.format(date)
 }
 const displayStatus:Record<string,string>={
  open:"Aberto",waiting_team:"Aguardando equipe",waiting_contact:"Aguardando cliente",resolved:"Resolvido"
@@ -55,8 +56,13 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
   const [pendingReplyId,setPendingReplyId]=useState<string|null>(null)
   const [detailOpen,setDetailOpen]=useState(true)
   const [mobileThread,setMobileThread]=useState(false)
+  const listInFlight=useRef(false)
+  const latestThreadRequest=useRef(0)
   
   const reload=useCallback(async()=>{
+    // A slow server must never accumulate concurrent polls of the same Inbox.
+    if(listInFlight.current)return
+    listInFlight.current=true
     try {
       const res=await fetch("/api/operator/inbox",{credentials:"same-origin",cache:"no-store"})
       if(!res.ok)throw new Error("inbox_unavailable")
@@ -66,15 +72,22 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
       setSelected(previous=>previous&&conversations.some(x=>x.id===previous)?previous:conversations[0]?.id??null)
       setError("")
     }catch(e){setError(errorTranslation[e instanceof Error?e.message:""]||"Falha na leitura das conversas.")}
-    finally{setLoading(false)}
+    finally{listInFlight.current=false;setLoading(false)}
   },[])
   const loadThread=useCallback(async(id:string)=>{
+    const request=++latestThreadRequest.current
     try{
       const res=await fetch(`/api/operator/inbox/${id}`,{credentials:"same-origin",cache:"no-store"})
       if(!res.ok)throw new Error("thread_unavailable")
-      setThread(await res.json() as Thread)
+      const result=await res.json() as Thread
+      // Ignore a slow response for a thread the user has already left.
+      if(request!==latestThreadRequest.current)return
+      setThread(result)
       setError("")
-    }catch{setThread(null);setError("Não foi possível consultar o histórico desta conversa.")}
+    }catch{
+      if(request!==latestThreadRequest.current)return
+      setThread(null);setError("Não foi possível consultar o histórico desta conversa.")
+    }
   },[])
 
   useEffect(()=>{
@@ -84,13 +97,23 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
         setSendEnabled(data.sendEnabled===true)
         setTenants(Array.isArray(data.tenants)?data.tenants:[])
       }).catch(()=>setSendEnabled(false))
-    const interval=setInterval(()=>{void reload()},30000)
-    return ()=>{clearTimeout(initial);clearInterval(interval)}
+    const interval=setInterval(()=>{
+      if(document.visibilityState==="visible")void reload()
+    },45000)
+    const onVisible=()=>{
+      if(document.visibilityState==="visible")void reload()
+    }
+    document.addEventListener("visibilitychange",onVisible)
+    return ()=>{
+      clearTimeout(initial);clearInterval(interval)
+      document.removeEventListener("visibilitychange",onVisible)
+    }
   },[reload])
   useEffect(()=>{
-    if(!selected)return
+    if(!selected){latestThreadRequest.current+=1;setThread(null);return}
+    setThread(null)
     const handle=setTimeout(()=>{void loadThread(selected)},0)
-    return ()=>clearTimeout(handle)
+    return ()=>{clearTimeout(handle);latestThreadRequest.current+=1}
   },[selected,loadThread])
 
   const visible=useMemo(()=>list.filter(item=>{
@@ -176,7 +199,7 @@ export default function OperatorInbox({operatorId}:{operatorId:string}) {
               <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#e5ece7] text-xs font-bold text-[#416551]">{item.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</span>
               <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><strong className="truncate text-[12px]">{item.name}</strong><span className="shrink-0 text-[10px] text-[#9aa8ad]">{dateTime(item.lastAt)}</span></span><span className="mt-1 block truncate text-[11px] text-[#80919a]">{item.summary||`${item.channel} · ${displayStatus[item.status]||item.status}`}</span><span className="mt-2 flex items-center gap-1.5"><span className="rounded-md bg-[#edf1f0] px-2 py-1 text-[10px] text-[#668076]">{item.department||item.category||"Triagem"}</span>{item.priority==="high"||item.priority==="urgent"?<span className="rounded-md bg-[#fff0e9] px-2 py-1 text-[10px] text-[#bf7448]">Prioridade</span>:null}{item.unread>0&&<span className="ml-auto grid min-w-5 place-items-center rounded-full bg-[#438565] px-1.5 py-0.5 text-[10px] font-bold text-white">{item.unread}</span>}</span></span>
             </button>)}</div>
-          <div className="mt-auto border-t border-[#edf0f2] px-5 py-4 text-[11px] text-[#99a6ad]">Atualização automática a cada 30 s</div>
+          <div className="mt-auto border-t border-[#edf0f2] px-5 py-4 text-[11px] text-[#99a6ad]">Atualização automática a cada 45 s, somente com a tela aberta</div>
         </aside>
         <section className={`${mobileThread?"flex":"hidden"} min-h-[650px] min-w-0 flex-col bg-[#f7f9f9] lg:flex`}>
           {!selectedConversation?<div className="grid flex-1 place-items-center px-7 text-center"><div><MessageCircle className="mx-auto mb-4 text-[#b2c0b8]" size={38}/><h2 className="font-semibold">Selecione uma conversa</h2><p className="mt-2 text-xs text-[#8a9aa2]">Mensagens reais aparecerão aqui, sem dados fictícios.</p></div></div>:<>
